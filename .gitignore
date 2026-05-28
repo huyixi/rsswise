@@ -1,0 +1,67 @@
+# AI agents
+.claude/
+.codex/
+.cursor/
+.continue/
+.windsurf/
+.roo/
+.cline/
+.worktrees/
+
+# Dependency directories
+node_modules/
+.pnpm-store/
+
+# Logs
+*.log
+*-debug.log
+*-error.log
+logs/
+
+# IDE
+.idea/
+.vscode/
+
+# Build outputs
+dist/
+build/
+.build/
+.next/
+target/
+
+# Cache
+.cache/
+__pycache__/
+
+# Local env files
+*.local
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Mac OS specific
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Mac OS thumbnails
+._*
+
+# Files that might appear in the root of a volume
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Directories potentially created on remote AFP share
+.AppleDB/
+.AppleDesktop/
+Network Trash Folder/
+Temporary Items/
+.apdisk
+.vercel

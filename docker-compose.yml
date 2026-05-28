@@ -1,0 +1,68 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-rsswise}
+      POSTGRES_USER: ${POSTGRES_USER:-rsswise}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rsswise}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+  api:
+    build:
+      context: ./apps/api
+    env_file: .env
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./apps/api:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - redis
+
+  worker:
+    build:
+      context: ./apps/api
+    env_file: .env
+    command: celery -A app.tasks.celery_app worker --loglevel=INFO
+    volumes:
+      - ./apps/api:/app
+    depends_on:
+      - api
+      - redis
+
+  beat:
+    build:
+      context: ./apps/api
+    env_file: .env
+    command: celery -A app.tasks.celery_app beat --loglevel=INFO
+    volumes:
+      - ./apps/api:/app
+    depends_on:
+      - worker
+      - redis
+
+  web:
+    build:
+      context: ./apps/web
+    env_file: .env
+    command: pnpm dev --hostname 0.0.0.0
+    volumes:
+      - ./apps/web:/app
+      - web_node_modules:/app/node_modules
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:
+  web_node_modules:

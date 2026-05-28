@@ -28,6 +28,7 @@ build/
 .build/
 .next/
 target/
+test-results/
 
 # Cache
 .cache/

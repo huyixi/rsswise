@@ -30,6 +30,10 @@ build/
 target/
 test-results/
 
+# Python
+.venv/
+*.egg-info/
+
 # Cache
 .cache/
 __pycache__/

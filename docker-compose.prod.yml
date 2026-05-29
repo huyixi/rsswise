@@ -1,0 +1,80 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-rsswise}
+      POSTGRES_USER: ${POSTGRES_USER:-rsswise}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rsswise}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-rsswise}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: ./apps/api
+    env_file: .env
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    build: ./apps/api
+    env_file: .env
+    command: celery -A app.tasks.celery_app worker --loglevel=INFO
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  beat:
+    build: ./apps/api
+    env_file: .env
+    command: celery -A app.tasks.celery_app beat --loglevel=INFO
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile.prod
+    env_file: .env
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://api:8000
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+    depends_on:
+      - web
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  caddy_data:

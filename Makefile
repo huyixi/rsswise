@@ -62,7 +62,7 @@ beat:
 	cd $(API_DIR) && $(API_ENV) uv run --no-sync celery -A app.tasks.celery_app beat --loglevel=INFO
 
 web:
-	cd $(WEB_DIR) && $(WEB_ENV) pnpm dev --hostname $(WEB_HOST)
+	cd $(WEB_DIR) && $(WEB_ENV) pnpm dev --host $(WEB_HOST)
 
 web-build:
 	cd $(WEB_DIR) && $(WEB_ENV) pnpm build

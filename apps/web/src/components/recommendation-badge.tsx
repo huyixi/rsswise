@@ -1,4 +1,4 @@
-import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import type { ReadingRecommendation } from "@/lib/api";
 
 const labels: Record<ReadingRecommendation, string> = {
@@ -7,13 +7,13 @@ const labels: Record<ReadingRecommendation, string> = {
   skip: "可以跳过",
 };
 
-const variants: Record<
-  ReadingRecommendation,
-  "success" | "info" | "warning"
-> = {
-  deep_read: "success",
-  skim: "info",
-  skip: "warning",
+const styles: Record<ReadingRecommendation, string> = {
+  deep_read:
+    "border-emerald-200 bg-emerald-50 text-emerald-700",
+  skim:
+    "border-blue-200 bg-blue-50 text-blue-700",
+  skip:
+    "border-amber-200 bg-amber-50 text-amber-700",
 };
 
 export function RecommendationBadge({
@@ -22,8 +22,13 @@ export function RecommendationBadge({
   value: ReadingRecommendation;
 }) {
   return (
-    <Badge size="lg" variant={variants[value]}>
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium",
+        styles[value],
+      )}
+    >
       {labels[value]}
-    </Badge>
+    </span>
   );
 }

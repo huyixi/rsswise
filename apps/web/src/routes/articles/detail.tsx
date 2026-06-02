@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react"
 import { useMutation, useQuery } from "@tanstack/react-query"
-import { useParams } from "react-router-dom"
+import { Link, useParams } from "react-router-dom"
+import { ArrowLeftIcon, SparklesIcon } from "lucide-react"
 
 import { MarkdownContent } from "@/components/markdown-content"
 import { RecommendationBadge } from "@/components/recommendation-badge"
@@ -93,7 +94,7 @@ export function ArticleDetailPage() {
 
   if (articleQuery.isLoading) {
     return (
-      <div className="flex items-center gap-2 text-sm text-slate-500">
+      <div className="flex items-center justify-center gap-2 py-20 text-sm text-slate-500">
         <Spinner />
         <span>加载文章中</span>
       </div>
@@ -115,47 +116,69 @@ export function ArticleDetailPage() {
     markReadMutation.error ?? markUnreadMutation.error ?? reanalyzeMutation.error
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-3">
+    <div className="space-y-8">
+      <Link
+        to="/articles"
+        className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900 transition-colors"
+      >
+        <ArrowLeftIcon className="size-4" />
+        返回文章列表
+      </Link>
+
+      <header className="space-y-3">
         <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
-          <span>{article.source_title}</span>
-          <span>·</span>
+          <span className="font-medium text-slate-700">{article.source_title}</span>
+          <span className="text-slate-300">·</span>
           <span>{formatDate(article.published_at)}</span>
         </div>
-        <h1 className="text-3xl font-semibold leading-tight text-slate-950">
+        <h1 className="text-3xl font-semibold leading-tight tracking-tight text-slate-950">
           {article.title}
         </h1>
         <a
           href={article.url}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex text-sm font-medium text-slate-700 underline-offset-4 hover:underline"
+          className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 underline-offset-4 hover:underline"
         >
-          原文链接
+          阅读原文
+          <svg className="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+            <polyline points="15 3 21 3 21 9" />
+            <line x1="10" y1="14" x2="21" y2="3" />
+          </svg>
         </a>
-      </div>
+      </header>
 
-      <section className="space-y-3 rounded border border-slate-200 bg-white p-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="text-base font-semibold">AI 信息</h2>
-          <div className="flex flex-wrap gap-2 text-xs text-slate-500">
+      <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex items-center gap-2">
+          <SparklesIcon className="size-4 text-blue-500" />
+          <h2 className="text-base font-semibold">AI 分析</h2>
+          <div className="ml-auto flex gap-3 text-xs text-slate-500">
             <span>正文：{statusLabel(article.extraction_status)}</span>
             <span>分析：{statusLabel(article.analysis_status)}</span>
           </div>
         </div>
+
         {article.reading_recommendation ? (
-          <RecommendationBadge value={article.reading_recommendation} />
+          <div>
+            <RecommendationBadge value={article.reading_recommendation} />
+          </div>
         ) : null}
+
         {article.one_sentence_summary ? (
-          <p className="text-sm leading-6 text-slate-900">
-            {article.one_sentence_summary}
-          </p>
+          <div className="rounded-lg bg-slate-50 p-3">
+            <p className="text-sm leading-6 text-slate-900">
+              {article.one_sentence_summary}
+            </p>
+          </div>
         ) : null}
+
         {article.reading_reason ? (
           <p className="text-sm leading-6 text-slate-600">
             {article.reading_reason}
           </p>
         ) : null}
+
         <div className="flex flex-wrap gap-2 pt-1">
           <Button
             type="button"
@@ -178,12 +201,15 @@ export function ArticleDetailPage() {
             重新 AI 分析
           </Button>
         </div>
+
         {mutationError ? (
           <p className="text-sm text-red-600">{mutationError.message}</p>
         ) : null}
       </section>
 
-      <MarkdownContent markdown={article.content_markdown ?? "正文处理中"} />
+      <div className="border-t border-slate-100 pt-6">
+        <MarkdownContent markdown={article.content_markdown ?? "正文处理中"} />
+      </div>
     </div>
   )
 }

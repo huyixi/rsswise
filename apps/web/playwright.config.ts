@@ -7,7 +7,7 @@ export default defineConfig({
     trace: "on-first-retry",
   },
   webServer: {
-    command: "pnpm dev --hostname 127.0.0.1",
+    command: "pnpm dev",
     reuseExistingServer: true,
     timeout: 120_000,
     url: "http://127.0.0.1:3000",

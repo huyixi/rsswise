@@ -1,6 +1,6 @@
 rss.huyixi.com {
-    reverse_proxy web:3000
-    log {
-        output file /data/caddy/access.log
-    }
+	reverse_proxy web:80
+	log {
+		output file /data/caddy/access.log
+	}
 }

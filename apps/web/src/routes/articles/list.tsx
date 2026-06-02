@@ -1,55 +1,63 @@
-import Link from "next/link";
+import { useEffect } from "react"
+import { useQuery } from "@tanstack/react-query"
+import { Link, useSearchParams } from "react-router-dom"
 
-import { RecommendationBadge } from "@/components/recommendation-badge";
-import { apiGet, type ArticleListItem } from "@/lib/api";
-
-export const dynamic = "force-dynamic";
+import { RecommendationBadge } from "@/components/recommendation-badge"
+import { Spinner } from "@/components/ui/spinner"
+import { apiGet, type ArticleListItem } from "@/lib/api"
+import { queryKeys } from "@/lib/query-keys"
 
 function formatDate(value: string | null) {
-  if (!value) return "未发布";
+  if (!value) return "未发布"
   return new Intl.DateTimeFormat("zh-CN", {
     dateStyle: "medium",
     timeStyle: "short",
-  }).format(new Date(value));
+  }).format(new Date(value))
 }
 
 function statusLinkClassName(active: boolean) {
   return active
     ? "rounded border border-slate-900 bg-slate-900 px-3 py-1.5 text-sm font-medium text-white"
-    : "rounded border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 hover:border-slate-300 hover:text-slate-900";
+    : "rounded border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 hover:border-slate-300 hover:text-slate-900"
 }
 
-export default async function ArticlesPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ status?: string }>;
-}) {
-  const params = await searchParams;
-  const status =
-    params.status === "read" || params.status === "unread"
-      ? params.status
-      : "all";
-  const articles = await apiGet<ArticleListItem[]>(
-    `/articles?status_filter=${status}`,
-  );
+function normalizeStatus(value: string | null) {
+  return value === "read" || value === "unread" ? value : "all"
+}
+
+export function ArticlesPage() {
+  const [searchParams] = useSearchParams()
+  const status = normalizeStatus(searchParams.get("status"))
+
+  useEffect(() => {
+    document.title = "文章 - RSSWise"
+  }, [])
+
+  const articlesQuery = useQuery({
+    queryKey: queryKeys.articles.list(status),
+    queryFn: () =>
+      apiGet<ArticleListItem[]>(
+        `/articles?status_filter=${encodeURIComponent(status)}`,
+      ),
+  })
 
   return (
     <div className="space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-semibold">文章</h1>
         <div className="flex gap-2">
-          <Link className={statusLinkClassName(status === "all")} href="/articles">
+          <Link className={statusLinkClassName(status === "all")} to="/articles">
             全部
           </Link>
           <Link
             className={statusLinkClassName(status === "read")}
-            href="/articles?status=read"
+            to="/articles?status=read"
           >
             已读
           </Link>
           <Link
             className={statusLinkClassName(status === "unread")}
-            href="/articles?status=unread"
+            to="/articles?status=unread"
           >
             未读
           </Link>
@@ -57,13 +65,22 @@ export default async function ArticlesPage({
       </div>
 
       <div className="divide-y rounded border border-slate-200 bg-white">
-        {articles.length === 0 ? (
+        {articlesQuery.isLoading ? (
+          <div className="flex items-center gap-2 p-6 text-sm text-slate-500">
+            <Spinner />
+            <span>加载文章中</span>
+          </div>
+        ) : articlesQuery.isError ? (
+          <div className="p-6 text-sm text-red-600">
+            {articlesQuery.error.message || "加载文章失败"}
+          </div>
+        ) : articlesQuery.data?.length === 0 ? (
           <div className="p-6 text-sm text-slate-500">暂无文章</div>
         ) : (
-          articles.map((article) => (
+          articlesQuery.data?.map((article) => (
             <Link
               key={article.id}
-              href={`/articles/${article.id}`}
+              to={`/articles/${article.id}`}
               className="block p-4 transition-colors hover:bg-slate-50"
             >
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -102,5 +119,5 @@ export default async function ArticlesPage({
         )}
       </div>
     </div>
-  );
+  )
 }

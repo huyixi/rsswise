@@ -17,37 +17,37 @@ export interface Step {
 const statusConfig = {
   pending: {
     icon: ClockIcon,
-    iconClass: "text-slate-300",
-    borderClass: "border-slate-200 bg-white",
-    labelClass: "text-slate-400",
-    connectorClass: "bg-slate-200",
+    iconClass: "text-muted-foreground/50",
+    borderClass: "border-border bg-background",
+    labelClass: "text-muted-foreground",
+    connectorClass: "bg-border",
   },
   processing: {
     icon: Loader2Icon,
-    iconClass: "text-blue-500",
-    borderClass: "border-blue-200 bg-blue-50",
-    labelClass: "text-blue-700",
-    connectorClass: "bg-blue-200",
+    iconClass: "text-info-foreground",
+    borderClass: "border-info/20 bg-info/5",
+    labelClass: "text-foreground",
+    connectorClass: "bg-info/20",
   },
   success: {
     icon: CheckCircle2Icon,
-    iconClass: "text-emerald-500",
-    borderClass: "border-emerald-200 bg-emerald-50",
-    labelClass: "text-emerald-700",
-    connectorClass: "bg-emerald-200",
+    iconClass: "text-success-foreground",
+    borderClass: "border-success/20 bg-success/5",
+    labelClass: "text-foreground",
+    connectorClass: "bg-success/20",
   },
   failed: {
     icon: AlertCircleIcon,
-    iconClass: "text-red-500",
-    borderClass: "border-red-200 bg-red-50",
-    labelClass: "text-red-700",
-    connectorClass: "bg-red-200",
+    iconClass: "text-destructive-foreground",
+    borderClass: "border-destructive/20 bg-destructive/5",
+    labelClass: "text-destructive-foreground",
+    connectorClass: "bg-destructive/20",
   },
 }
 
 export function WorkflowStepper({ steps }: { steps: Step[] }) {
   return (
-    <div className="space-y-0">
+    <div className="flex flex-col gap-0">
       {steps.map((step, i) => {
         const config = statusConfig[step.status]
         const Icon = config.icon
@@ -85,12 +85,12 @@ export function WorkflowStepper({ steps }: { steps: Step[] }) {
               <p className={cn("text-sm font-medium leading-tight", config.labelClass)}>
                 {step.label}
               </p>
-              <p className="mt-0.5 text-xs leading-relaxed text-slate-500">
+              <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
                 {step.description}
               </p>
 
               {step.status === "failed" && step.failureMessage && (
-                <p className="mt-1 text-xs leading-relaxed text-red-600">
+                <p className="mt-1 text-xs leading-relaxed text-destructive-foreground">
                   {step.failureMessage}
                 </p>
               )}

@@ -17,8 +17,8 @@ function formatDate(value: string | null) {
 
 function statusLinkClassName(active: boolean) {
   return active
-    ? "rounded-lg border border-slate-900 bg-slate-900 px-3 py-1.5 text-sm font-medium text-white shadow-xs"
-    : "rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 shadow-xs hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+    ? "rounded-md bg-foreground px-2.5 py-1.5 text-xs font-medium text-background"
+    : "rounded-md px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
 }
 
 function normalizeStatus(value: string | null) {
@@ -29,15 +29,12 @@ function SkeletonCard() {
   return (
     <div className="animate-pulse p-4">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0 flex-1 space-y-3">
-          <div className="flex items-center gap-2">
-            <div className="h-5 w-3/5 rounded bg-slate-200" />
-            <div className="h-4 w-8 rounded bg-slate-200" />
-          </div>
-          <div className="h-4 w-2/5 rounded bg-slate-100" />
-          <div className="h-4 w-4/5 rounded bg-slate-100" />
+        <div className="flex min-w-0 flex-1 flex-col gap-3">
+          <div className="h-4 w-3/5 rounded bg-muted" />
+          <div className="h-3.5 w-2/5 rounded bg-muted" />
+          <div className="h-3.5 w-4/5 rounded bg-muted" />
         </div>
-        <div className="h-6 w-16 shrink-0 rounded-full bg-slate-200" />
+        <div className="h-5 w-16 shrink-0 rounded bg-muted" />
       </div>
     </div>
   )
@@ -60,10 +57,10 @@ export function ArticlesPage() {
   })
 
   return (
-    <div className="space-y-5">
+    <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight">文章</h1>
-        <div className="flex gap-2">
+        <h1 className="text-xl font-semibold text-foreground">文章</h1>
+        <div className="flex w-fit rounded-lg border bg-card p-0.5">
           <Link className={statusLinkClassName(status === "all")} to="/articles">
             全部
           </Link>
@@ -82,7 +79,7 @@ export function ArticlesPage() {
         </div>
       </div>
 
-      <div className="divide-y rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="divide-y overflow-hidden rounded-lg border bg-card">
         {articlesQuery.isLoading ? (
           <>
             <SkeletonCard />
@@ -90,49 +87,49 @@ export function ArticlesPage() {
             <SkeletonCard />
           </>
         ) : articlesQuery.isError ? (
-          <div className="flex items-center gap-2 p-6 text-sm text-red-600">
-            <span className="size-1.5 rounded-full bg-red-500" />
+          <div className="flex items-center gap-2 p-6 text-sm text-destructive-foreground">
+            <span aria-hidden="true" className="size-1.5 rounded-full bg-destructive" />
             {articlesQuery.error.message || "加载文章失败"}
           </div>
         ) : articlesQuery.data?.length === 0 ? (
           <div className="flex flex-col items-center gap-3 py-16 text-center">
-            <FileTextIcon className="size-10 text-slate-300" />
-            <p className="text-sm text-slate-500">暂无文章</p>
+            <FileTextIcon aria-hidden="true" className="size-9 text-muted-foreground/40" />
+            <p className="text-sm text-muted-foreground">暂无文章</p>
           </div>
         ) : (
           articlesQuery.data?.map((article) => (
             <Link
               key={article.id}
               to={`/articles/${article.id}`}
-              className="group block p-4 transition-all hover:bg-slate-50"
+              className="block p-4 transition-colors hover:bg-accent/50"
             >
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0 space-y-2">
+                <div className="flex min-w-0 flex-col gap-2">
                   <div className="flex flex-wrap items-center gap-2">
                     <h2
                       className={
                         article.is_read
-                          ? "text-base font-medium text-slate-500"
-                          : "text-base font-semibold text-slate-950"
+                          ? "text-base font-medium text-muted-foreground"
+                          : "text-base font-semibold text-foreground"
                       }
                     >
                       {article.title}
                     </h2>
                     {article.is_read ? (
-                      <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-500">
+                      <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
                         已读
                       </span>
                     ) : (
-                      <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[11px] font-medium text-blue-600">
+                      <span className="rounded bg-foreground px-1.5 py-0.5 text-[11px] font-medium text-background">
                         未读
                       </span>
                     )}
                   </div>
-                  <p className="text-sm text-slate-500">
+                  <p className="text-sm text-muted-foreground">
                     {article.source_title} · {formatDate(article.published_at)}
                   </p>
                   {article.one_sentence_summary ? (
-                    <p className="line-clamp-2 text-sm leading-6 text-slate-700">
+                    <p className="line-clamp-2 text-sm leading-6 text-muted-foreground">
                       {article.one_sentence_summary}
                     </p>
                   ) : null}

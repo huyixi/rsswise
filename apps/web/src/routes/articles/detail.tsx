@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react"
 import { useMutation, useQuery } from "@tanstack/react-query"
 import { Link, useParams } from "react-router-dom"
-import { ArrowLeftIcon, SparklesIcon } from "lucide-react"
+import { ArrowLeftIcon, ExternalLinkIcon, SparklesIcon } from "lucide-react"
 
 import { MarkdownContent } from "@/components/markdown-content"
 import { RecommendationBadge } from "@/components/recommendation-badge"
@@ -89,12 +89,12 @@ export function ArticleDetailPage() {
   }, [articleQuery.data?.title])
 
   if (!id) {
-    return <div className="text-sm text-red-600">文章 ID 无效</div>
+    return <div className="text-sm text-destructive-foreground">文章 ID 无效</div>
   }
 
   if (articleQuery.isLoading) {
     return (
-      <div className="flex items-center justify-center gap-2 py-20 text-sm text-slate-500">
+      <div className="flex items-center justify-center gap-2 py-20 text-sm text-muted-foreground">
         <Spinner />
         <span>加载文章中</span>
       </div>
@@ -103,7 +103,7 @@ export function ArticleDetailPage() {
 
   if (articleQuery.isError) {
     return (
-      <div className="text-sm text-red-600">
+      <div className="text-sm text-destructive-foreground">
         {articleQuery.error.message || "加载文章失败"}
       </div>
     )
@@ -116,44 +116,40 @@ export function ArticleDetailPage() {
     markReadMutation.error ?? markUnreadMutation.error ?? reanalyzeMutation.error
 
   return (
-    <div className="space-y-8">
+    <div className="flex flex-col gap-8">
       <Link
         to="/articles"
-        className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900 transition-colors"
+        className="inline-flex w-fit items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
       >
-        <ArrowLeftIcon className="size-4" />
+        <ArrowLeftIcon aria-hidden="true" className="size-4" />
         返回文章列表
       </Link>
 
-      <header className="space-y-3">
-        <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
-          <span className="font-medium text-slate-700">{article.source_title}</span>
-          <span className="text-slate-300">·</span>
+      <header className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">{article.source_title}</span>
+          <span aria-hidden="true">/</span>
           <span>{formatDate(article.published_at)}</span>
         </div>
-        <h1 className="text-3xl font-semibold leading-tight tracking-tight text-slate-950">
+        <h1 className="text-3xl font-semibold leading-tight text-foreground">
           {article.title}
         </h1>
         <a
           href={article.url}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 underline-offset-4 hover:underline"
+          className="inline-flex w-fit items-center gap-1 text-sm font-medium text-foreground underline-offset-4 hover:underline"
         >
           阅读原文
-          <svg className="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-            <polyline points="15 3 21 3 21 9" />
-            <line x1="10" y1="14" x2="21" y2="3" />
-          </svg>
+          <ExternalLinkIcon aria-hidden="true" className="size-3.5" />
         </a>
       </header>
 
-      <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <section className="flex flex-col gap-4 rounded-lg border bg-card p-5">
         <div className="flex items-center gap-2">
-          <SparklesIcon className="size-4 text-blue-500" />
+          <SparklesIcon aria-hidden="true" className="size-4 text-muted-foreground" />
           <h2 className="text-base font-semibold">AI 分析</h2>
-          <div className="ml-auto flex gap-3 text-xs text-slate-500">
+          <div className="ml-auto flex gap-3 text-xs text-muted-foreground">
             <span>正文：{statusLabel(article.extraction_status)}</span>
             <span>分析：{statusLabel(article.analysis_status)}</span>
           </div>
@@ -166,15 +162,15 @@ export function ArticleDetailPage() {
         ) : null}
 
         {article.one_sentence_summary ? (
-          <div className="rounded-lg bg-slate-50 p-3">
-            <p className="text-sm leading-6 text-slate-900">
+          <div className="rounded-lg border bg-background p-3">
+            <p className="text-sm leading-6 text-foreground">
               {article.one_sentence_summary}
             </p>
           </div>
         ) : null}
 
         {article.reading_reason ? (
-          <p className="text-sm leading-6 text-slate-600">
+          <p className="text-sm leading-6 text-muted-foreground">
             {article.reading_reason}
           </p>
         ) : null}
@@ -203,11 +199,11 @@ export function ArticleDetailPage() {
         </div>
 
         {mutationError ? (
-          <p className="text-sm text-red-600">{mutationError.message}</p>
+          <p className="text-sm text-destructive-foreground">{mutationError.message}</p>
         ) : null}
       </section>
 
-      <div className="border-t border-slate-100 pt-6">
+      <div className="border-t pt-6">
         <MarkdownContent markdown={article.content_markdown ?? "正文处理中"} />
       </div>
     </div>

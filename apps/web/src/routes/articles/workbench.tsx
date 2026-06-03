@@ -30,19 +30,19 @@ function normalizeStatus(value: string | null) {
   return value === "read" || value === "unread" ? value : "all"
 }
 
-function statusLinkClassName(active: boolean) {
+function statusFilterClassName(active: boolean) {
   return active
-    ? "rounded-lg border border-slate-900 bg-slate-900 px-3 py-1.5 text-sm font-medium text-white shadow-xs"
-    : "rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 shadow-xs hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+    ? "rounded-md bg-foreground px-2.5 py-1.5 text-xs font-medium text-background"
+    : "rounded-md px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
 }
 
 function SkeletonCard() {
   return (
-    <div className="animate-pulse space-y-3 rounded-lg border border-slate-100 bg-white p-4">
-      <div className="space-y-2">
-        <div className="h-4 w-4/5 rounded bg-slate-200" />
-        <div className="h-3 w-3/5 rounded bg-slate-100" />
-        <div className="h-3 w-2/5 rounded bg-slate-100" />
+    <div className="animate-pulse border-b px-4 py-3">
+      <div className="flex flex-col gap-2">
+        <div className="h-3.5 w-4/5 rounded bg-muted" />
+        <div className="h-3 w-3/5 rounded bg-muted" />
+        <div className="h-3 w-2/5 rounded bg-muted" />
       </div>
     </div>
   )
@@ -146,26 +146,28 @@ function ArticleListPanel({
   errorMessage: string
 }) {
   return (
-    <aside className="flex w-[320px] shrink-0 flex-col border-r border-slate-200 bg-white">
-      <div className="border-b border-slate-100 px-4 py-3">
-        <h2 className="mb-3 text-sm font-semibold text-slate-900">文章列表</h2>
-        <div className="flex gap-1.5">
-          {(["all", "read", "unread"] as const).map((s) => (
-            <button
-              key={s}
-              type="button"
-              className={statusLinkClassName(status === s)}
-              onClick={() => onStatusChange(s)}
-            >
-              {s === "all" ? "全部" : s === "read" ? "已读" : "未读"}
-            </button>
-          ))}
+    <aside className="flex w-[320px] shrink-0 flex-col border-r bg-background max-lg:w-full max-lg:border-r-0 max-lg:border-b">
+      <div className="border-b px-4 py-3">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold text-foreground">文章列表</h2>
+          <div className="flex rounded-lg border bg-card p-0.5">
+            {(["all", "read", "unread"] as const).map((s) => (
+              <button
+                key={s}
+                type="button"
+                className={statusFilterClassName(status === s)}
+                onClick={() => onStatusChange(s)}
+              >
+                {s === "all" ? "全部" : s === "read" ? "已读" : "未读"}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto">
         {isLoading ? (
-          <div className="space-y-2 p-4">
+          <div>
             <SkeletonCard />
             <SkeletonCard />
             <SkeletonCard />
@@ -173,16 +175,16 @@ function ArticleListPanel({
           </div>
         ) : isError ? (
           <div className="flex items-center justify-center p-8">
-            <p className="text-sm text-red-600">{errorMessage}</p>
+            <p className="text-sm text-destructive-foreground">{errorMessage}</p>
           </div>
         ) : !articles || articles.length === 0 ? (
           <div className="flex flex-col items-center gap-3 py-16 text-center">
-            <InboxIcon className="size-10 text-slate-300" />
-            <p className="text-sm text-slate-500">暂无文章</p>
-            <p className="text-xs text-slate-400">添加 Feed 后文章将自动出现</p>
+            <InboxIcon aria-hidden="true" className="size-9 text-muted-foreground/40" />
+            <p className="text-sm text-muted-foreground">暂无文章</p>
+            <p className="text-xs text-muted-foreground/70">添加 Feed 后文章将自动出现</p>
           </div>
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y">
             {articles.map((article) => {
               const isSelected = article.id === selectedId
               return (
@@ -190,10 +192,10 @@ function ArticleListPanel({
                   key={article.id}
                   type="button"
                   className={cn(
-                    "w-full text-left transition-colors",
+                    "w-full border-l-2 text-left transition-colors",
                     isSelected
-                      ? "border-l-2 border-blue-500 bg-blue-50/50"
-                      : "border-l-2 border-transparent hover:bg-slate-50",
+                      ? "bg-accent"
+                      : "border-transparent hover:bg-accent/60",
                   )}
                   onClick={() => onSelect(article.id)}
                 >
@@ -204,18 +206,18 @@ function ArticleListPanel({
                           className={cn(
                             "truncate text-sm leading-snug",
                             article.is_read
-                              ? "font-normal text-slate-500"
-                              : "font-semibold text-slate-900",
-                            isSelected && "text-blue-900",
+                              ? "font-normal text-muted-foreground"
+                              : "font-medium text-foreground",
+                            isSelected && "text-foreground",
                           )}
                         >
                           {article.title}
                         </p>
-                        <p className="mt-1 truncate text-xs text-slate-400">
+                        <p className="mt-1 truncate text-xs text-muted-foreground">
                           {article.source_title} · {formatDate(article.published_at)}
                         </p>
                         {article.one_sentence_summary && (
-                          <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-slate-500">
+                          <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
                             {article.one_sentence_summary}
                           </p>
                         )}
@@ -224,7 +226,7 @@ function ArticleListPanel({
                         {article.reading_recommendation ? (
                           <RecommendationBadge value={article.reading_recommendation} />
                         ) : !article.is_read ? (
-                          <span className="inline-block size-2 rounded-full bg-blue-500" />
+                          <span className="inline-block size-2 rounded-full bg-foreground" />
                         ) : null}
                       </div>
                     </div>
@@ -252,14 +254,14 @@ function ArticleContentPanel({
 }) {
   if (!article && !isLoading && !isError) {
     return (
-      <div className="flex flex-1 items-center justify-center bg-slate-50/50">
+      <div className="flex flex-1 items-center justify-center bg-card max-lg:min-h-[320px]">
         <div className="flex flex-col items-center gap-4 text-center">
-          <div className="flex size-16 items-center justify-center rounded-2xl border border-slate-200 bg-white shadow-xs">
-            <BookOpenIcon className="size-7 text-slate-400" />
+          <div className="flex size-12 items-center justify-center rounded-lg border bg-background">
+            <BookOpenIcon aria-hidden="true" className="size-5 text-muted-foreground" />
           </div>
           <div>
-            <p className="text-base font-medium text-slate-900">选择一篇文章开始阅读</p>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="text-sm font-medium text-foreground">选择一篇文章开始阅读</p>
+            <p className="mt-1 text-sm text-muted-foreground">
               从左侧列表中选择文章后，正文将显示在这里
             </p>
           </div>
@@ -270,8 +272,8 @@ function ArticleContentPanel({
 
   if (isLoading) {
     return (
-      <div className="flex flex-1 items-center justify-center bg-slate-50/50">
-        <div className="flex items-center gap-2 text-sm text-slate-500">
+      <div className="flex flex-1 items-center justify-center bg-card max-lg:min-h-[320px]">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Spinner />
           <span>加载文章中</span>
         </div>
@@ -281,9 +283,9 @@ function ArticleContentPanel({
 
   if (isError) {
     return (
-      <div className="flex flex-1 items-center justify-center bg-slate-50/50">
+      <div className="flex flex-1 items-center justify-center bg-card max-lg:min-h-[320px]">
         <div className="text-center">
-          <p className="text-sm text-red-600">{errorMessage}</p>
+          <p className="text-sm text-destructive-foreground">{errorMessage}</p>
         </div>
       </div>
     )
@@ -292,16 +294,16 @@ function ArticleContentPanel({
   if (!article) return null
 
   return (
-    <main className="flex-1 overflow-y-auto bg-white">
-      <article className="mx-auto max-w-3xl px-8 py-6">
-        <header className="space-y-3">
-          <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
-            <span className="font-medium text-slate-700">{article.source_title}</span>
-            <span className="text-slate-300">·</span>
+    <main className="min-w-0 flex-1 overflow-y-auto bg-card">
+      <article className="mx-auto flex max-w-3xl flex-col gap-6 px-6 py-8 md:px-8">
+        <header className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">{article.source_title}</span>
+            <span aria-hidden="true">/</span>
             <span>{formatDate(article.published_at)}</span>
           </div>
 
-          <h1 className="text-2xl font-semibold leading-tight tracking-tight text-slate-950">
+          <h1 className="text-2xl font-semibold leading-tight text-foreground">
             {article.title}
           </h1>
 
@@ -309,14 +311,14 @@ function ArticleContentPanel({
             href={article.url}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 underline-offset-4 hover:underline"
+            className="inline-flex w-fit items-center gap-1 text-sm font-medium text-foreground underline-offset-4 hover:underline"
           >
             阅读原文
-            <ExternalLinkIcon className="size-3.5" />
+            <ExternalLinkIcon aria-hidden="true" className="size-3.5" />
           </a>
         </header>
 
-        <div className="mt-6 border-t border-slate-100 pt-6">
+        <div className="border-t pt-6">
           <MarkdownContent markdown={article.content_markdown ?? "正文处理中……"} />
         </div>
       </article>
@@ -341,14 +343,14 @@ function AISummaryPanel({
 }) {
   if (!article && !isLoading) {
     return (
-      <aside className="flex w-[340px] shrink-0 flex-col border-l border-slate-200 bg-white">
+      <aside className="flex w-[340px] shrink-0 flex-col border-l bg-background max-xl:w-[300px] max-lg:w-full max-lg:border-l-0 max-lg:border-t">
         <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
-          <div className="flex size-12 items-center justify-center rounded-xl bg-slate-50">
-            <SparklesIcon className="size-6 text-slate-400" />
+          <div className="flex size-10 items-center justify-center rounded-lg border bg-card">
+            <SparklesIcon aria-hidden="true" className="size-5 text-muted-foreground" />
           </div>
           <div>
-            <p className="text-sm font-medium text-slate-700">AI 分析</p>
-            <p className="mt-1 text-xs text-slate-400">选择文章后将显示处理进度和分析结果</p>
+            <p className="text-sm font-medium text-foreground">AI 分析</p>
+            <p className="mt-1 text-xs text-muted-foreground">选择文章后将显示处理进度和分析结果</p>
           </div>
         </div>
       </aside>
@@ -356,11 +358,11 @@ function AISummaryPanel({
   }
 
   return (
-    <aside className="flex w-[340px] shrink-0 flex-col border-l border-slate-200 bg-white">
-      <div className="border-b border-slate-100 px-5 py-4">
+    <aside className="flex w-[340px] shrink-0 flex-col border-l bg-background max-xl:w-[300px] max-lg:w-full max-lg:border-l-0 max-lg:border-t">
+      <div className="border-b px-5 py-3">
         <div className="flex items-center gap-2">
-          <SparklesIcon className="size-4 text-blue-500" />
-          <h2 className="text-sm font-semibold text-slate-900">AI 分析</h2>
+          <SparklesIcon aria-hidden="true" className="size-4 text-muted-foreground" />
+          <h2 className="text-sm font-semibold text-foreground">AI 分析</h2>
         </div>
       </div>
 
@@ -370,7 +372,7 @@ function AISummaryPanel({
             <Spinner />
           </div>
         ) : article ? (
-          <div className="space-y-6">
+          <div className="flex flex-col gap-6">
             <WorkflowStepper
               steps={buildWorkflowSteps(
                 article.extraction_status,
@@ -380,16 +382,16 @@ function AISummaryPanel({
             />
 
             {article.reading_recommendation && (
-              <div className="space-y-3 rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+              <div className="flex flex-col gap-3 rounded-lg border bg-card p-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-slate-500">阅读建议</span>
+                  <span className="text-xs font-medium text-muted-foreground">阅读建议</span>
                   <RecommendationBadge value={article.reading_recommendation} />
                 </div>
 
                 {article.one_sentence_summary && (
                   <div>
-                    <p className="mb-1 text-xs font-medium text-slate-500">摘要</p>
-                    <p className="text-sm leading-relaxed text-slate-900">
+                    <p className="mb-1 text-xs font-medium text-muted-foreground">摘要</p>
+                    <p className="text-sm leading-relaxed text-foreground">
                       {article.one_sentence_summary}
                     </p>
                   </div>
@@ -397,8 +399,8 @@ function AISummaryPanel({
 
                 {article.reading_reason && (
                   <div>
-                    <p className="mb-1 text-xs font-medium text-slate-500">理由</p>
-                    <p className="text-sm leading-relaxed text-slate-600">
+                    <p className="mb-1 text-xs font-medium text-muted-foreground">理由</p>
+                    <p className="text-sm leading-relaxed text-muted-foreground">
                       {article.reading_reason}
                     </p>
                   </div>
@@ -431,19 +433,19 @@ function AISummaryPanel({
               </Button>
             </div>
 
-            <div className="space-y-2 rounded-lg border border-slate-100 bg-slate-50/50 px-4 py-3">
-              <p className="text-xs font-medium text-slate-500">当前状态</p>
-              <div className="space-y-1.5 text-xs text-slate-600">
+            <div className="flex flex-col gap-2 rounded-lg border bg-card px-4 py-3">
+              <p className="text-xs font-medium text-muted-foreground">当前状态</p>
+              <div className="flex flex-col gap-1.5 text-xs text-muted-foreground">
                 <div className="flex items-center justify-between">
                   <span>正文提取</span>
                   <span
                     className={cn(
                       "font-medium",
-                      article.extraction_status === "success" && "text-emerald-600",
-                      article.extraction_status === "processing" && "text-blue-600",
-                      article.extraction_status === "failed" && "text-red-600",
+                      article.extraction_status === "success" && "text-success-foreground",
+                      article.extraction_status === "processing" && "text-info-foreground",
+                      article.extraction_status === "failed" && "text-destructive-foreground",
                       (!article.extraction_status || article.extraction_status === "pending") &&
-                        "text-slate-400",
+                        "text-muted-foreground",
                     )}
                   >
                     {statusLabel(article.extraction_status)}
@@ -454,11 +456,11 @@ function AISummaryPanel({
                   <span
                     className={cn(
                       "font-medium",
-                      article.analysis_status === "success" && "text-emerald-600",
-                      article.analysis_status === "processing" && "text-blue-600",
-                      article.analysis_status === "failed" && "text-red-600",
+                      article.analysis_status === "success" && "text-success-foreground",
+                      article.analysis_status === "processing" && "text-info-foreground",
+                      article.analysis_status === "failed" && "text-destructive-foreground",
                       (!article.analysis_status || article.analysis_status === "pending") &&
-                        "text-slate-400",
+                        "text-muted-foreground",
                     )}
                   >
                     {statusLabel(article.analysis_status)}
@@ -586,7 +588,7 @@ export function ArticleWorkbenchPage() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-57px)]">
+    <div className="flex h-[calc(100vh-49px)] overflow-hidden max-lg:h-auto max-lg:min-h-[calc(100vh-49px)] max-lg:flex-col">
       <ArticleListPanel
         articles={articlesQuery.data}
         selectedId={selectedId}

@@ -10,7 +10,7 @@ AI-assisted RSS reader MVP aligned to `docs/design.md`.
 - Worker: Celery, Celery Beat, Redis
 - RSS / Extraction: feedparser, trafilatura
 - AI: DeepSeek API
-- Deploy: Docker Compose
+- Deploy: Docker Compose behind host Caddy
 
 ## Local Development
 

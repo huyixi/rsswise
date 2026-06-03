@@ -1,6 +1,13 @@
-rss.huyixi.com {
-	reverse_proxy web:80
-	log {
-		output file /data/caddy/access.log
-	}
+# rsswise host Caddy site blocks.
+# Merge these into /etc/caddy/Caddyfile; do not replace other host sites.
+# The web container publishes 127.0.0.1:3000:80 for this upstream.
+
+http://rss.huyixi.com {
+	reverse_proxy 127.0.0.1:3000
+	encode gzip
+}
+
+https://rss.huyixi.com {
+	reverse_proxy 127.0.0.1:3000
+	encode gzip
 }

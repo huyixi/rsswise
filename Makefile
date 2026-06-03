@@ -1,8 +1,13 @@
-.PHONY: help install dev-up dev-down dev-logs dev-reset api worker beat test web web-build check db-migrate
+.PHONY: help install dev-up dev-down dev-logs dev-reset deploy-check deploy api worker beat test web web-build check db-migrate
 
 COMPOSE_DEV := docker compose -f docker-compose.dev.yml
+COMPOSE_PROD := docker compose -f docker-compose.prod.yml
 API_DIR := apps/api
 WEB_DIR := apps/web
+DEPLOY_SCRIPT := scripts/deploy.sh
+
+SSH_HOST ?= rss.huyixi.com
+SSH_PATH ?= /root/rsswise
 
 DATABASE_URL ?= postgresql+psycopg://rsswise:rsswise@127.0.0.1:5432/rsswise
 REDIS_URL ?= redis://127.0.0.1:6379/0
@@ -28,11 +33,20 @@ help:
 	@echo "  make test         Run backend tests"
 	@echo "  make web          Run frontend locally"
 	@echo "  make web-build    Build frontend"
-	@echo "  make check        Run test/build checks"
+	@echo "  make check        Run local checks (tests + build)"
+	@echo ""
+	@echo "Deploy commands:"
+	@echo "  make deploy-check Run full checks before deploy"
+	@echo "  make deploy       Fast deploy to server"
 
 install:
 	cd $(API_DIR) && uv venv && uv pip install -e ".[dev]"
 	cd $(WEB_DIR) && pnpm install
+
+deploy-check: check
+
+deploy:
+	SSH_HOST="$(SSH_HOST)" SSH_PATH="$(SSH_PATH)" COMPOSE_PROD="$(COMPOSE_PROD)" $(DEPLOY_SCRIPT)
 
 dev-up:
 	$(COMPOSE_DEV) up -d postgres redis

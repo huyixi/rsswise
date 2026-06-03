@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 test("feed management exposes MVP actions", async ({ page }) => {
-  await page.route("http://127.0.0.1:8000/feeds", async (route) => {
+  await page.route("**/api/feeds", async (route) => {
     await route.fulfill({ json: [] });
   });
 

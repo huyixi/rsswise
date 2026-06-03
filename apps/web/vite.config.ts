@@ -12,6 +12,13 @@ export default defineConfig({
   envPrefix: "VITE_",
   server: {
     port: 3000,
+    proxy: {
+      "/api": {
+        target: "http://127.0.0.1:8000",
+        changeOrigin: true,
+        rewrite: (requestPath) => requestPath.replace(/^\/api/, ""),
+      },
+    },
   },
   preview: {
     port: 3000,

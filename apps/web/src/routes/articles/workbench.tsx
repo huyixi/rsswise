@@ -10,9 +10,7 @@ import {
 
 import { MarkdownContent } from "@/components/markdown-content"
 import { RecommendationBadge } from "@/components/recommendation-badge"
-import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
-import { WorkflowStepper, type Step } from "@/components/workflow-stepper"
 import { cn } from "@/lib/utils"
 import { apiGet, apiPost, type ArticleDetail, type ArticleListItem } from "@/lib/api"
 import { queryClient } from "@/lib/query-client"
@@ -46,84 +44,6 @@ function SkeletonCard() {
       </div>
     </div>
   )
-}
-
-function buildWorkflowSteps(
-  extraction: string | null,
-  analysis: string | null,
-  onRetry?: () => void,
-): Step[] {
-  return [
-    {
-      id: "extraction",
-      label: "获取正文",
-      description:
-        extraction === "pending"
-          ? "正在排队等待提取"
-          : extraction === "processing"
-            ? "正在提取文章正文内容"
-            : extraction === "success"
-              ? "正文提取完成"
-              : extraction === "failed"
-                ? "正文提取失败"
-                : "等待提取",
-      status: statusToStepStatus(extraction),
-      failureMessage:
-        extraction === "failed" ? "无法从原文链接提取正文，请检查原文是否可访问。" : undefined,
-      onRetry: extraction === "failed" ? onRetry : undefined,
-      retryLabel: "重新提取",
-    },
-    {
-      id: "analysis",
-      label: "AI 分析",
-      description:
-        analysis === "pending"
-          ? extraction !== "success"
-            ? "等待正文提取完成后自动开始"
-            : "正在排队等待 AI 分析"
-          : analysis === "processing"
-            ? "正在生成摘要和阅读建议"
-            : analysis === "success"
-              ? "AI 分析完成"
-              : analysis === "failed"
-                ? "AI 分析失败"
-                : "等待分析",
-      status: statusToStepStatus(analysis),
-      failureMessage:
-        analysis === "failed" ? "AI 服务暂时不可用，请稍后重试。" : undefined,
-      onRetry: analysis === "failed" ? onRetry : undefined,
-      retryLabel: "重新分析",
-    },
-    {
-      id: "ready",
-      label: "阅读准备就绪",
-      description:
-        extraction === "success" && analysis === "success"
-          ? "所有处理已完成，可以开始阅读"
-          : extraction === "failed" || analysis === "failed"
-            ? "部分步骤失败，请重试后继续"
-            : "等待上游步骤完成",
-      status:
-        extraction === "success" && analysis === "success"
-          ? "success"
-          : extraction === "failed" || analysis === "failed"
-            ? "failed"
-            : "pending",
-      failureMessage:
-        extraction === "failed"
-          ? "正文提取失败，无法进入阅读环节"
-          : analysis === "failed"
-            ? "AI 分析失败，但不影响阅读正文"
-            : undefined,
-    },
-  ]
-}
-
-function statusToStepStatus(value: string | null): "pending" | "processing" | "success" | "failed" {
-  if (value === "success") return "success"
-  if (value === "processing") return "processing"
-  if (value === "failed") return "failed"
-  return "pending"
 }
 
 function ArticleListPanel({
@@ -192,7 +112,7 @@ function ArticleListPanel({
                   key={article.id}
                   type="button"
                   className={cn(
-                    "w-full border-l-2 text-left transition-colors",
+                    "w-full text-left transition-colors",
                     isSelected
                       ? "bg-accent"
                       : "border-transparent hover:bg-accent/60",
@@ -329,17 +249,9 @@ function ArticleContentPanel({
 function AISummaryPanel({
   article,
   isLoading,
-  onReanalyze,
-  onMarkUnread,
-  isReanalyzing,
-  isMarkingUnread,
 }: {
   article: ArticleDetail | undefined
   isLoading: boolean
-  onReanalyze: () => void
-  onMarkUnread: () => void
-  isReanalyzing: boolean
-  isMarkingUnread: boolean
 }) {
   if (!article && !isLoading) {
     return (
@@ -358,128 +270,41 @@ function AISummaryPanel({
   }
 
   return (
-    <aside className="flex w-[340px] shrink-0 flex-col border-l bg-background max-xl:w-[300px] max-lg:w-full max-lg:border-l-0 max-lg:border-t">
-      <div className="border-b px-5 py-3">
-        <div className="flex items-center gap-2">
-          <SparklesIcon aria-hidden="true" className="size-4 text-muted-foreground" />
-          <h2 className="text-sm font-semibold text-foreground">AI 分析</h2>
-        </div>
-      </div>
+      <aside className="flex w-[340px] shrink-0 flex-col border-l bg-background max-xl:w-[300px] max-lg:w-full max-lg:border-l-0 max-lg:border-t">
+        <div className="flex-1 overflow-y-auto px-5 py-4">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Spinner />
+            </div>
+          ) : article?.reading_recommendation ? (
+            <div className="flex flex-col gap-3 rounded-lg border bg-card p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-muted-foreground">阅读建议</span>
+                <RecommendationBadge value={article.reading_recommendation} />
+              </div>
 
-      <div className="flex-1 overflow-y-auto px-5 py-4">
-        {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Spinner />
-          </div>
-        ) : article ? (
-          <div className="flex flex-col gap-6">
-            <WorkflowStepper
-              steps={buildWorkflowSteps(
-                article.extraction_status,
-                article.analysis_status,
-                onReanalyze,
+              {article.one_sentence_summary && (
+                <div>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">摘要</p>
+                  <p className="text-sm leading-relaxed text-foreground">
+                    {article.one_sentence_summary}
+                  </p>
+                </div>
               )}
-            />
 
-            {article.reading_recommendation && (
-              <div className="flex flex-col gap-3 rounded-lg border bg-card p-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-muted-foreground">阅读建议</span>
-                  <RecommendationBadge value={article.reading_recommendation} />
+              {article.reading_reason && (
+                <div>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">理由</p>
+                  <p className="text-sm leading-relaxed text-muted-foreground">
+                    {article.reading_reason}
+                  </p>
                 </div>
-
-                {article.one_sentence_summary && (
-                  <div>
-                    <p className="mb-1 text-xs font-medium text-muted-foreground">摘要</p>
-                    <p className="text-sm leading-relaxed text-foreground">
-                      {article.one_sentence_summary}
-                    </p>
-                  </div>
-                )}
-
-                {article.reading_reason && (
-                  <div>
-                    <p className="mb-1 text-xs font-medium text-muted-foreground">理由</p>
-                    <p className="text-sm leading-relaxed text-muted-foreground">
-                      {article.reading_reason}
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div className="flex flex-col gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="w-full"
-                loading={isMarkingUnread}
-                disabled={isMarkingUnread}
-                onClick={onMarkUnread}
-              >
-                标记未读
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                className="w-full"
-                loading={isReanalyzing}
-                disabled={isReanalyzing}
-                onClick={onReanalyze}
-              >
-                重新 AI 分析
-              </Button>
+              )}
             </div>
-
-            <div className="flex flex-col gap-2 rounded-lg border bg-card px-4 py-3">
-              <p className="text-xs font-medium text-muted-foreground">当前状态</p>
-              <div className="flex flex-col gap-1.5 text-xs text-muted-foreground">
-                <div className="flex items-center justify-between">
-                  <span>正文提取</span>
-                  <span
-                    className={cn(
-                      "font-medium",
-                      article.extraction_status === "success" && "text-success-foreground",
-                      article.extraction_status === "processing" && "text-info-foreground",
-                      article.extraction_status === "failed" && "text-destructive-foreground",
-                      (!article.extraction_status || article.extraction_status === "pending") &&
-                        "text-muted-foreground",
-                    )}
-                  >
-                    {statusLabel(article.extraction_status)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>AI 分析</span>
-                  <span
-                    className={cn(
-                      "font-medium",
-                      article.analysis_status === "success" && "text-success-foreground",
-                      article.analysis_status === "processing" && "text-info-foreground",
-                      article.analysis_status === "failed" && "text-destructive-foreground",
-                      (!article.analysis_status || article.analysis_status === "pending") &&
-                        "text-muted-foreground",
-                    )}
-                  >
-                    {statusLabel(article.analysis_status)}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : null}
-      </div>
-    </aside>
+          ) : null}
+        </div>
+      </aside>
   )
-}
-
-function statusLabel(value: string | null) {
-  if (value === "success") return "完成"
-  if (value === "processing") return "处理中"
-  if (value === "failed") return "失败"
-  return "等待中"
 }
 
 export function ArticleWorkbenchPage() {
@@ -526,28 +351,6 @@ export function ArticleWorkbenchPage() {
     },
   })
 
-  const markUnreadMutation = useMutation({
-    mutationFn: (articleId: string) => apiPost(`/articles/${articleId}/unread`),
-    onSuccess: (_, articleId) => {
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.articles.detail(articleId),
-      })
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.articles.all,
-      })
-    },
-  })
-
-  const reanalyzeMutation = useMutation({
-    mutationFn: (articleId: string) =>
-      apiPost(`/articles/${articleId}/reanalyze`),
-    onSuccess: (_, articleId) => {
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.articles.detail(articleId),
-      })
-    },
-  })
-
   useEffect(() => {
     if (!selectedId || markedReadIdRef.current === selectedId) return
     markedReadIdRef.current = selectedId
@@ -575,18 +378,6 @@ export function ArticleWorkbenchPage() {
     })
   }
 
-  function handleReanalyze() {
-    if (selectedId) {
-      reanalyzeMutation.mutate(selectedId)
-    }
-  }
-
-  function handleMarkUnread() {
-    if (selectedId) {
-      markUnreadMutation.mutate(selectedId)
-    }
-  }
-
   return (
     <div className="flex h-[calc(100vh-49px)] overflow-hidden max-lg:h-auto max-lg:min-h-[calc(100vh-49px)] max-lg:flex-col">
       <ArticleListPanel
@@ -610,10 +401,6 @@ export function ArticleWorkbenchPage() {
       <AISummaryPanel
         article={articleQuery.data}
         isLoading={articleQuery.isLoading}
-        onReanalyze={handleReanalyze}
-        onMarkUnread={handleMarkUnread}
-        isReanalyzing={reanalyzeMutation.isPending}
-        isMarkingUnread={markUnreadMutation.isPending}
       />
     </div>
   )

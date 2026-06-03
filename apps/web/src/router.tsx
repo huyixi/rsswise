@@ -1,9 +1,8 @@
-import { createBrowserRouter } from "react-router-dom"
+import { createBrowserRouter, Navigate } from "react-router-dom"
 import { App } from "./App"
-import { ArticleDetailPage } from "./routes/articles/detail"
-import { ArticlesPage } from "./routes/articles/list"
 import { FeedsPage } from "./routes/feeds/list"
 import { HomePage } from "./routes/home"
+import { ArticleWorkbenchPage } from "./routes/articles/workbench"
 
 export const router = createBrowserRouter([
   {
@@ -11,8 +10,8 @@ export const router = createBrowserRouter([
     element: <App />,
     children: [
       { index: true, element: <HomePage /> },
-      { path: "articles", element: <ArticlesPage /> },
-      { path: "articles/:id", element: <ArticleDetailPage /> },
+      { path: "articles", element: <ArticleWorkbenchPage /> },
+      { path: "articles/:id", element: <Navigate to="/articles" replace /> },
       { path: "feeds", element: <FeedsPage /> },
     ],
   },

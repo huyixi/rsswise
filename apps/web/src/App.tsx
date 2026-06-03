@@ -1,10 +1,13 @@
-import { Link, Outlet } from "react-router-dom"
+import { Link, Outlet, useLocation } from "react-router-dom"
 
 export function App() {
+  const location = useLocation()
+  const isWorkbench = location.pathname === "/articles"
+
   return (
     <>
       <header className="border-b border-slate-200 bg-white shadow-xs">
-        <nav className="mx-auto flex max-w-5xl items-center gap-6 px-4 py-3">
+        <nav className="flex items-center gap-6 px-5 py-3">
           <Link to="/articles" className="text-lg font-bold tracking-tight text-slate-900">
             RSSWise
           </Link>
@@ -24,9 +27,13 @@ export function App() {
           </div>
         </nav>
       </header>
-      <main className="mx-auto max-w-5xl px-4 py-6 animate-fade-in">
+      {isWorkbench ? (
         <Outlet />
-      </main>
+      ) : (
+        <main className="mx-auto max-w-5xl px-4 py-6 animate-fade-in">
+          <Outlet />
+        </main>
+      )}
     </>
   )
 }

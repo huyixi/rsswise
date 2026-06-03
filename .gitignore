@@ -39,12 +39,15 @@ test-results/
 __pycache__/
 
 # Local env files
-*.local
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!.env.compose.example
+!**/.env.example
+!**/.env.*.example
+*.local
 
 # Mac OS specific
 .DS_Store

@@ -1,7 +1,7 @@
-.PHONY: help install dev-up dev-down dev-logs dev-reset deploy-check deploy api worker beat test web web-build check db-migrate
+.PHONY: help install dev-up dev-down dev-logs dev-reset deploy-check deploy api worker beat test web web-build check db-migrate env-check
 
-COMPOSE_DEV := docker compose -f docker-compose.dev.yml
-COMPOSE_PROD := docker compose -f docker-compose.prod.yml
+COMPOSE_DEV := docker compose --env-file .env.compose -f docker-compose.dev.yml
+COMPOSE_PROD := docker compose --env-file .env.compose.production -f docker-compose.prod.yml
 API_DIR := apps/api
 WEB_DIR := apps/web
 DEPLOY_SCRIPT := scripts/deploy.sh
@@ -9,15 +9,9 @@ DEPLOY_SCRIPT := scripts/deploy.sh
 SSH_HOST ?= rsswise-prod
 SSH_PATH ?= /home/ubuntu/rsswise
 
-DATABASE_URL ?= postgresql+psycopg://rsswise:rsswise@127.0.0.1:5432/rsswise
-REDIS_URL ?= redis://127.0.0.1:6379/0
 API_HOST ?= 127.0.0.1
 API_PORT ?= 8000
 WEB_HOST ?= 127.0.0.1
-VITE_API_BASE_URL ?= /api
-
-API_ENV := DATABASE_URL="$(DATABASE_URL)" REDIS_URL="$(REDIS_URL)"
-WEB_ENV := VITE_API_BASE_URL="$(VITE_API_BASE_URL)"
 
 help:
 	@echo "Local development commands:"
@@ -33,6 +27,7 @@ help:
 	@echo "  make test         Run backend tests"
 	@echo "  make web          Run frontend locally"
 	@echo "  make web-build    Build frontend"
+	@echo "  make env-check    Check env safety rules"
 	@echo "  make check        Run local checks (tests + build)"
 	@echo ""
 	@echo "Deploy commands:"
@@ -61,27 +56,31 @@ dev-reset:
 	$(COMPOSE_DEV) down -v
 
 test:
-	cd $(API_DIR) && $(API_ENV) uv run --no-sync pytest -v
+	cd $(API_DIR) && uv run --no-sync pytest -v
 
 api:
-	cd $(API_DIR) && $(API_ENV) uv run --no-sync uvicorn app.main:app --host $(API_HOST) --port $(API_PORT) --reload
+	cd $(API_DIR) && uv run --no-sync uvicorn app.main:app --host $(API_HOST) --port $(API_PORT) --reload
 
 db-migrate:
-	cd $(API_DIR) && $(API_ENV) uv run --no-sync alembic upgrade head
+	cd $(API_DIR) && uv run --no-sync alembic upgrade head
 
 worker:
-	cd $(API_DIR) && $(API_ENV) uv run --no-sync celery -A app.tasks.celery_app worker --loglevel=INFO
+	cd $(API_DIR) && uv run --no-sync celery -A app.tasks.celery_app worker --loglevel=INFO
 
 beat:
-	cd $(API_DIR) && $(API_ENV) uv run --no-sync celery -A app.tasks.celery_app beat --loglevel=INFO
+	cd $(API_DIR) && uv run --no-sync celery -A app.tasks.celery_app beat --loglevel=INFO
 
 web:
-	cd $(WEB_DIR) && $(WEB_ENV) pnpm dev --host $(WEB_HOST)
+	cd $(WEB_DIR) && pnpm dev --host $(WEB_HOST)
 
 web-build:
-	cd $(WEB_DIR) && $(WEB_ENV) pnpm build
+	cd $(WEB_DIR) && pnpm build
+
+env-check:
+	./scripts/check-env-safety.sh
 
 check:
-	cd $(API_DIR) && $(API_ENV) uv run --no-sync pytest -v
-	cd $(API_DIR) && $(API_ENV) uv run --no-sync ruff check app tests
-	cd $(WEB_DIR) && $(WEB_ENV) pnpm build
+	cd $(API_DIR) && uv run --no-sync pytest -v
+	cd $(API_DIR) && uv run --no-sync ruff check app tests
+	cd $(WEB_DIR) && pnpm build
+	./scripts/check-env-safety.sh

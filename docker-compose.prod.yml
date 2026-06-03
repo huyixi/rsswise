@@ -27,6 +27,9 @@ services:
     build: ./apps/api
     env_file:
       - ./apps/api/.env.production
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-rsswise}:${POSTGRES_PASSWORD:-rsswise}@postgres:5432/${POSTGRES_DB:-rsswise}
+      REDIS_URL: redis://redis:6379/0
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
     depends_on:
       postgres:
@@ -39,6 +42,9 @@ services:
     build: ./apps/api
     env_file:
       - ./apps/api/.env.production
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-rsswise}:${POSTGRES_PASSWORD:-rsswise}@postgres:5432/${POSTGRES_DB:-rsswise}
+      REDIS_URL: redis://redis:6379/0
     command: celery -A app.tasks.celery_app worker --loglevel=INFO
     depends_on:
       redis:
@@ -49,6 +55,9 @@ services:
     build: ./apps/api
     env_file:
       - ./apps/api/.env.production
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-rsswise}:${POSTGRES_PASSWORD:-rsswise}@postgres:5432/${POSTGRES_DB:-rsswise}
+      REDIS_URL: redis://redis:6379/0
     command: celery -A app.tasks.celery_app beat --loglevel=INFO
     depends_on:
       redis:

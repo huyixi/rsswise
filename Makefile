@@ -6,8 +6,8 @@ API_DIR := apps/api
 WEB_DIR := apps/web
 DEPLOY_SCRIPT := scripts/deploy.sh
 
-SSH_HOST ?= rss.huyixi.com
-SSH_PATH ?= /root/rsswise
+SSH_HOST ?= rsswise-prod
+SSH_PATH ?= /home/ubuntu/rsswise
 
 DATABASE_URL ?= postgresql+psycopg://rsswise:rsswise@127.0.0.1:5432/rsswise
 REDIS_URL ?= redis://127.0.0.1:6379/0

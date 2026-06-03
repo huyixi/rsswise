@@ -3,7 +3,7 @@ set -eu
 
 SSH_HOST=${SSH_HOST:-rsswise-prod}
 SSH_PATH=${SSH_PATH:-/home/ubuntu/rsswise}
-COMPOSE_PROD=${COMPOSE_PROD:-docker compose -f docker-compose.prod.yml}
+COMPOSE_PROD=${COMPOSE_PROD:-docker compose --env-file .env.compose.production -f docker-compose.prod.yml}
 
 quote_for_remote_sh() {
 	printf "'%s'" "$(printf "%s" "$1" | sed "s/'/'\\\\''/g")"

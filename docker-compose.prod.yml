@@ -25,7 +25,8 @@ services:
 
   api:
     build: ./apps/api
-    env_file: .env
+    env_file:
+      - ./apps/api/.env.production
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
     depends_on:
       postgres:
@@ -36,7 +37,8 @@ services:
 
   worker:
     build: ./apps/api
-    env_file: .env
+    env_file:
+      - ./apps/api/.env.production
     command: celery -A app.tasks.celery_app worker --loglevel=INFO
     depends_on:
       redis:
@@ -45,7 +47,8 @@ services:
 
   beat:
     build: ./apps/api
-    env_file: .env
+    env_file:
+      - ./apps/api/.env.production
     command: celery -A app.tasks.celery_app beat --loglevel=INFO
     depends_on:
       redis:

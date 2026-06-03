@@ -18,7 +18,11 @@ services:
   api:
     build:
       context: ./apps/api
-    env_file: .env
+    env_file:
+      - ./apps/api/.env
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-rsswise}:${POSTGRES_PASSWORD:-rsswise}@postgres:5432/${POSTGRES_DB:-rsswise}
+      REDIS_URL: redis://redis:6379/0
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     volumes:
       - ./apps/api:/app
@@ -31,7 +35,11 @@ services:
   worker:
     build:
       context: ./apps/api
-    env_file: .env
+    env_file:
+      - ./apps/api/.env
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-rsswise}:${POSTGRES_PASSWORD:-rsswise}@postgres:5432/${POSTGRES_DB:-rsswise}
+      REDIS_URL: redis://redis:6379/0
     command: celery -A app.tasks.celery_app worker --loglevel=INFO
     volumes:
       - ./apps/api:/app
@@ -42,7 +50,11 @@ services:
   beat:
     build:
       context: ./apps/api
-    env_file: .env
+    env_file:
+      - ./apps/api/.env
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-rsswise}:${POSTGRES_PASSWORD:-rsswise}@postgres:5432/${POSTGRES_DB:-rsswise}
+      REDIS_URL: redis://redis:6379/0
     command: celery -A app.tasks.celery_app beat --loglevel=INFO
     volumes:
       - ./apps/api:/app
@@ -53,7 +65,8 @@ services:
   web:
     build:
       context: ./apps/web
-    env_file: .env
+    environment:
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
     command: pnpm dev --hostname 0.0.0.0
     volumes:
       - ./apps/web:/app

@@ -1,0 +1,76 @@
+name: check
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: rsswise
+          POSTGRES_USER: rsswise
+          POSTGRES_PASSWORD: rsswise
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U rsswise -d rsswise"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    defaults:
+      run:
+        working-directory: apps/api
+    env:
+      APP_ENV: test
+      LOG_LEVEL: WARNING
+      DATABASE_URL: postgresql+psycopg://rsswise:rsswise@127.0.0.1:5432/rsswise
+      REDIS_URL: redis://127.0.0.1:6379/1
+      CORS_ORIGINS: http://127.0.0.1:3000,http://localhost:3000
+      DEEPSEEK_API_KEY: ""
+      DEEPSEEK_BASE_URL: https://api.deepseek.com
+      DEEPSEEK_MODEL: deepseek-chat
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: uv venv
+      - run: uv pip install -e ".[dev]"
+      - run: uv run --no-sync pytest -v
+      - run: uv run --no-sync ruff check app tests
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    env:
+      VITE_API_BASE_URL: /api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.3.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: apps/web/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build

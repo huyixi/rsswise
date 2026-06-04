@@ -45,11 +45,12 @@ def clear_session_cookie(response: Response) -> None:
 
 def create_session(db: DbSession, user: User) -> str:
     token = generate_session_token()
+    expires_at = datetime.now(UTC) + timedelta(seconds=settings.session_max_age_seconds)
     db.add(
         Session(
             user_id=user.id,
             token_hash=hash_session_token(token),
-            expires_at=datetime.now(UTC).replace(tzinfo=None) + timedelta(seconds=settings.session_max_age_seconds),
+            expires_at=expires_at,
         )
     )
     return token

@@ -1,4 +1,5 @@
 from collections.abc import Iterator
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -9,8 +10,10 @@ from sqlalchemy.pool import StaticPool
 
 from app.core.security import hash_password, hash_session_token, verify_password
 from app.db.session import get_db
+from app.dependencies.auth import get_current_user
 from app.main import app
-from app.models import Base
+from app.models import Base, Session, User
+from app.routers.auth import create_session
 
 
 def test_password_hash_round_trip():
@@ -107,3 +110,38 @@ def test_login_rejects_wrong_password(client: TestClient):
     )
 
     assert response.status_code == 401
+
+
+def test_create_session_uses_utc_aware_expiration(client: TestClient):
+    session_local = client.app.state.testing_session_local
+    with session_local() as db:
+        user = User(email="user@example.com", password_hash=hash_password("password123"))
+        db.add(user)
+        db.flush()
+
+        create_session(db, user)
+        created_session = next(obj for obj in db.new if isinstance(obj, Session))
+
+    assert created_session.expires_at.tzinfo is UTC
+
+
+def test_current_user_compares_utc_aware_session_expiration():
+    token = "raw-session-token"
+    user = User(email="user@example.com", password_hash=hash_password("password123"))
+    auth_session = Session(
+        user=user,
+        token_hash=hash_session_token(token),
+        expires_at=datetime.now(UTC) + timedelta(days=1),
+    )
+
+    class Result:
+        def scalar_one_or_none(self):
+            return auth_session
+
+    class Db:
+        def execute(self, statement):
+            return Result()
+
+    current_user = get_current_user(session_token=token, db=Db())
+
+    assert current_user.email == "user@example.com"

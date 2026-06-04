@@ -11,6 +11,12 @@ from app.db.session import get_db
 from app.models import Session, User
 
 
+def utc_aware(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
 def get_current_user(
     session_token: str | None = Cookie(default=None, alias=settings.session_cookie_name),
     db: DbSession = Depends(get_db),
@@ -26,7 +32,7 @@ def get_current_user(
         .where(Session.token_hash == hash_session_token(session_token))
         .options(joinedload(Session.user))
     ).scalar_one_or_none()
-    if session is None or session.expires_at <= datetime.now(UTC).replace(tzinfo=None):
+    if session is None or utc_aware(session.expires_at) <= datetime.now(UTC):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="not authenticated",

@@ -67,3 +67,20 @@ CORS_ORIGINS=https://rss.huyixi.com
 ```
 
 `VITE_API_BASE_URL` is public and is read from `.env.compose.production` as a web image build arg. Changing it requires rebuilding the web image.
+
+### Email Digest
+
+Email digests are configured in the web settings dialog, including recipient, enabled state, send interval in days, and send time. The backend sends mail through SMTP values from `apps/api/.env` or `apps/api/.env.production`:
+
+```text
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USER=rsswise@example.com
+SMTP_PASSWORD=change-me
+SMTP_FROM_EMAIL=rsswise@example.com
+SMTP_FROM_NAME=RSSWise
+SMTP_USE_TLS=true
+SMTP_USE_SSL=false
+```
+
+The digest send interval and send time are stored in the database. Send time is interpreted as `Asia/Shanghai`.

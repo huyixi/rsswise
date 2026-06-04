@@ -9,6 +9,7 @@ def test_settings_reads_explicit_values() -> None:
         database_url="postgresql+psycopg://user:pass@127.0.0.1:5432/rsswise",
         redis_url="redis://127.0.0.1:6379/0",
         app_env="development",
+        log_level="INFO",
         deepseek_api_key="",
     )
 

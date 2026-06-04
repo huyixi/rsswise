@@ -1,0 +1,168 @@
+from __future__ import annotations
+
+from html import escape
+from io import BytesIO
+from textwrap import dedent
+from uuid import NAMESPACE_URL, uuid5
+from zipfile import ZIP_DEFLATED, ZIP_STORED, ZipFile, ZipInfo
+
+from app.models import Article
+
+ZIP_TIMESTAMP = (1980, 1, 1, 0, 0, 0)
+
+
+def markdown_to_xhtml(markdown: str | None) -> str:
+    if not markdown:
+        return "<p>正文抽取未完成或失败。</p>"
+
+    paragraphs = [part.strip() for part in markdown.split("\n\n") if part.strip()]
+    if not paragraphs:
+        return "<p>正文抽取未完成或失败。</p>"
+    return "\n".join(f"<p>{escape(part).replace(chr(10), '<br />')}</p>" for part in paragraphs)
+
+
+def article_chapter_xhtml(article: Article, index: int) -> str:
+    summary = ""
+    reason = ""
+    if article.ai_analysis is not None:
+        summary = article.ai_analysis.one_sentence_summary or ""
+        reason = article.ai_analysis.reading_reason or ""
+
+    source_title = article.feed.title if article.feed else ""
+    article_body = markdown_to_xhtml(article.content.content_markdown if article.content else None)
+
+    return dedent(
+        f"""\
+        <?xml version="1.0" encoding="utf-8"?>
+        <!DOCTYPE html>
+        <html xmlns="http://www.w3.org/1999/xhtml" lang="zh-CN">
+          <head>
+            <title>{escape(article.title)}</title>
+            <meta charset="utf-8" />
+          </head>
+          <body>
+            <h1>{escape(article.title)}</h1>
+            <p><strong>来源：</strong>{escape(source_title)}</p>
+            <p><strong>链接：</strong><a href="{escape(article.url)}">{escape(article.url)}</a></p>
+            <p><strong>AI 摘要：</strong>{escape(summary) if summary else "暂无 AI 总结"}</p>
+            <p><strong>阅读理由：</strong>{escape(reason) if reason else "暂无阅读理由"}</p>
+            {article_body}
+          </body>
+        </html>
+        """
+    )
+
+
+def _stable_identifier(articles: list[Article], digest_date: str) -> str:
+    article_keys = "|".join(article.url for article in articles)
+    return f"urn:uuid:{uuid5(NAMESPACE_URL, f'rsswise:{digest_date}:{article_keys}')}"
+
+
+def _write_file(
+    archive: ZipFile,
+    path: str,
+    content: str | bytes,
+    *,
+    compress_type: int,
+) -> None:
+    info = ZipInfo(path, date_time=ZIP_TIMESTAMP)
+    info.compress_type = compress_type
+    archive.writestr(info, content)
+
+
+def build_digest_epub(articles: list[Article], *, digest_date: str) -> bytes:
+    identifier = _stable_identifier(articles, digest_date)
+    chapter_items = "\n".join(
+        (
+            f'<item id="article-{index:03d}" '
+            f'href="chapters/article-{index:03d}.xhtml" '
+            'media-type="application/xhtml+xml" />'
+        )
+        for index, _ in enumerate(articles, start=1)
+    )
+    spine_items = "\n".join(
+        f'<itemref idref="article-{index:03d}" />'
+        for index, _ in enumerate(articles, start=1)
+    )
+    nav_items = "\n".join(
+        f'<li><a href="chapters/article-{index:03d}.xhtml">{escape(article.title)}</a></li>'
+        for index, article in enumerate(articles, start=1)
+    )
+
+    content_opf = dedent(
+        f"""\
+        <?xml version="1.0" encoding="utf-8"?>
+        <package xmlns="http://www.idpf.org/2007/opf" unique-identifier="book-id" version="3.0">
+          <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+            <dc:identifier id="book-id">{identifier}</dc:identifier>
+            <dc:title>RSSWise Digest - {digest_date}</dc:title>
+            <dc:language>zh-CN</dc:language>
+            <dc:creator>RSSWise</dc:creator>
+          </metadata>
+          <manifest>
+            <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav" />
+            {chapter_items}
+          </manifest>
+          <spine>
+            {spine_items}
+          </spine>
+        </package>
+        """
+    )
+
+    nav_xhtml = dedent(
+        f"""\
+        <?xml version="1.0" encoding="utf-8"?>
+        <!DOCTYPE html>
+        <html xmlns="http://www.w3.org/1999/xhtml" lang="zh-CN">
+          <head><title>RSSWise Digest - {digest_date}</title></head>
+          <body>
+            <nav epub:type="toc" xmlns:epub="http://www.idpf.org/2007/ops">
+              <h1>RSSWise Digest - {digest_date}</h1>
+              <ol>{nav_items}</ol>
+            </nav>
+          </body>
+        </html>
+        """
+    )
+
+    toc_ncx = dedent(
+        f"""\
+        <?xml version="1.0" encoding="utf-8"?>
+        <ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">
+          <head><meta name="dtb:uid" content="{identifier}" /></head>
+          <docTitle><text>RSSWise Digest - {digest_date}</text></docTitle>
+          <navMap></navMap>
+        </ncx>
+        """
+    )
+
+    output = BytesIO()
+    with ZipFile(output, "w") as archive:
+        _write_file(archive, "mimetype", "application/epub+zip", compress_type=ZIP_STORED)
+        _write_file(
+            archive,
+            "META-INF/container.xml",
+            dedent(
+                """\
+                <?xml version="1.0" encoding="utf-8"?>
+                <container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+                  <rootfiles>
+                    <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml" />
+                  </rootfiles>
+                </container>
+                """
+            ),
+            compress_type=ZIP_DEFLATED,
+        )
+        _write_file(archive, "OEBPS/content.opf", content_opf, compress_type=ZIP_DEFLATED)
+        _write_file(archive, "OEBPS/nav.xhtml", nav_xhtml, compress_type=ZIP_DEFLATED)
+        _write_file(archive, "OEBPS/toc.ncx", toc_ncx, compress_type=ZIP_DEFLATED)
+        for index, article in enumerate(articles, start=1):
+            _write_file(
+                archive,
+                f"OEBPS/chapters/article-{index:03d}.xhtml",
+                article_chapter_xhtml(article, index),
+                compress_type=ZIP_DEFLATED,
+            )
+    return output.getvalue()

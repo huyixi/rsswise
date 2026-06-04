@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID
 
 from celery import Celery
@@ -16,6 +16,7 @@ from app.models import (
     ReadingRecommendation,
 )
 from app.services.ai_service import analyze_markdown_with_deepseek
+from app.services.email_digest_service import run_due_email_digest
 from app.services.extraction_service import fetch_and_extract_markdown
 from app.services.feed_service import refresh_feed_by_id
 
@@ -36,7 +37,7 @@ def extract_article_task(article_id: str) -> None:
             markdown = fetch_and_extract_markdown(content.article.url)
             content.content_markdown = markdown
             content.extraction_status = ExtractionStatus.success
-            content.extracted_at = datetime.utcnow()
+            content.extracted_at = datetime.now(UTC).replace(tzinfo=None)
             db.commit()
             analyze_article_task.delay(article_id)
         except Exception:
@@ -62,11 +63,11 @@ def analyze_article_task(article_id: str) -> None:
             analysis.reading_recommendation = ReadingRecommendation(result.reading_recommendation)
             analysis.reading_reason = result.reading_reason
             analysis.analysis_status = AnalysisStatus.success
-            analysis.updated_at = datetime.utcnow()
+            analysis.updated_at = datetime.now(UTC).replace(tzinfo=None)
             db.commit()
         except Exception:
             analysis.analysis_status = AnalysisStatus.failed
-            analysis.updated_at = datetime.utcnow()
+            analysis.updated_at = datetime.now(UTC).replace(tzinfo=None)
             db.commit()
             raise
 
@@ -84,3 +85,9 @@ def refresh_all_feeds_task() -> None:
 def refresh_feed_task(feed_id: str) -> None:
     with SessionLocal() as db:
         refresh_feed_by_id(db, UUID(feed_id))
+
+
+@celery_app.task(name="email_digest.run_due")
+def run_due_email_digest_task() -> str:
+    with SessionLocal() as db:
+        return run_due_email_digest(db)

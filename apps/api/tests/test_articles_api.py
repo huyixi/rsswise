@@ -19,6 +19,8 @@ from app.models import (
     ExtractionStatus,
     Feed,
     ReadingRecommendation,
+    UserArticleState,
+    UserFeedSubscription,
 )
 
 
@@ -49,7 +51,16 @@ def client() -> Iterator[TestClient]:
     Base.metadata.drop_all(bind=engine)
 
 
-def seed_article(client: TestClient, *, is_read: bool = False) -> UUID:
+def register(client: TestClient, email: str = "user@example.com") -> dict:
+    response = client.post(
+        "/auth/register",
+        json={"email": email, "password": "password123"},
+    )
+    assert response.status_code == 201
+    return response.json()
+
+
+def seed_article(client: TestClient, *, user_id: str, is_read: bool = False) -> UUID:
     session_local = client.app.state.testing_session_local
     with session_local() as db:
         feed = Feed(
@@ -65,10 +76,11 @@ def seed_article(client: TestClient, *, is_read: bool = False) -> UUID:
             published_at=datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC),
             summary_from_feed="Feed summary",
             guid="post-1",
-            is_read=is_read,
         )
         db.add(article)
         db.flush()
+        db.add(UserFeedSubscription(user_id=UUID(user_id), feed_id=feed.id))
+        db.add(UserArticleState(user_id=UUID(user_id), article_id=article.id, is_read=is_read))
         db.add(
             ArticleContent(
                 article_id=article.id,
@@ -104,7 +116,8 @@ def test_recommendation_labels_are_design_values():
 
 
 def test_list_articles_supports_design_read_filters(client: TestClient):
-    article_id = seed_article(client, is_read=False)
+    user = register(client)
+    article_id = seed_article(client, user_id=user["id"], is_read=False)
 
     unread_response = client.get("/articles?status_filter=unread")
 
@@ -126,6 +139,7 @@ def test_detail_read_state_and_reanalysis_use_existing_markdown(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ):
+    user = register(client)
     queued_ai_analysis: list[str] = []
     queued_extraction: list[str] = []
     monkeypatch.setattr(
@@ -136,7 +150,7 @@ def test_detail_read_state_and_reanalysis_use_existing_markdown(
         "app.tasks.extract_article_task.delay",
         lambda article_id: queued_extraction.append(article_id),
     )
-    article_id = seed_article(client, is_read=False)
+    article_id = seed_article(client, user_id=user["id"], is_read=False)
 
     detail_response = client.get(f"/articles/{article_id}")
 
@@ -160,3 +174,26 @@ def test_detail_read_state_and_reanalysis_use_existing_markdown(
     assert reanalyze_response.json() == {"status": "queued"}
     assert queued_ai_analysis == [str(article_id)]
     assert queued_extraction == []
+
+
+def test_articles_require_login(client: TestClient):
+    assert client.get("/articles").status_code == 401
+
+
+def test_read_state_is_isolated_per_user(client: TestClient):
+    first_user = register(client, "first@example.com")
+    article_id = seed_article(client, user_id=first_user["id"], is_read=False)
+    assert client.post(f"/articles/{article_id}/read").status_code == 204
+    assert client.get("/articles?status_filter=read").json()[0]["id"] == str(article_id)
+
+    second_client = TestClient(app)
+    second_user = register(second_client, "second@example.com")
+    session_local = client.app.state.testing_session_local
+    with session_local() as db:
+        article = db.get(Article, article_id)
+        assert article is not None
+        db.add(UserFeedSubscription(user_id=UUID(second_user["id"]), feed_id=article.feed_id))
+        db.commit()
+
+    assert second_client.get("/articles?status_filter=read").json() == []
+    assert second_client.get("/articles?status_filter=unread").json()[0]["id"] == str(article_id)

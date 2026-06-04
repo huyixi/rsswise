@@ -1,18 +1,59 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.db.session import get_db
-from app.models import Article
+from app.dependencies.auth import get_current_user
+from app.models import Article, User, UserArticleState, UserFeedSubscription
 from app.tasks import analyze_article_task
 
 router = APIRouter(prefix="/articles", tags=["articles"])
 
 
+def subscribed_article_statement(user: User):
+    return (
+        select(Article)
+        .join(UserFeedSubscription, UserFeedSubscription.feed_id == Article.feed_id)
+        .where(UserFeedSubscription.user_id == user.id)
+    )
+
+
+def get_subscribed_article_or_404(article_id: UUID, user: User, db: Session) -> Article:
+    article = db.execute(
+        subscribed_article_statement(user)
+        .where(Article.id == article_id)
+        .options(
+            joinedload(Article.feed),
+            joinedload(Article.content),
+            joinedload(Article.ai_analysis),
+        )
+    ).scalar_one_or_none()
+    if article is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="article not found",
+        )
+    return article
+
+
+def set_read_state(db: Session, user: User, article_id: UUID, is_read: bool) -> None:
+    state = db.get(UserArticleState, (user.id, article_id))
+    if state is None:
+        state = UserArticleState(user_id=user.id, article_id=article_id, is_read=is_read)
+        db.add(state)
+    else:
+        state.is_read = is_read
+    db.commit()
+
+
 @router.get("")
-def list_articles(status_filter: str = "all", db: Session = Depends(get_db)):
+def list_articles(
+    status_filter: str = "all",
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     if status_filter not in {"all", "read", "unread"}:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -20,16 +61,25 @@ def list_articles(status_filter: str = "all", db: Session = Depends(get_db)):
         )
 
     statement = (
-        select(Article)
+        subscribed_article_statement(current_user)
+        .outerjoin(
+            UserArticleState,
+            and_(
+                UserArticleState.article_id == Article.id,
+                UserArticleState.user_id == current_user.id,
+            ),
+        )
         .options(joinedload(Article.feed), joinedload(Article.ai_analysis))
         .order_by(Article.published_at.desc().nullslast(), Article.created_at.desc())
     )
     if status_filter == "read":
-        statement = statement.where(Article.is_read.is_(True))
+        statement = statement.where(UserArticleState.is_read.is_(True))
     if status_filter == "unread":
-        statement = statement.where(Article.is_read.is_(False))
+        statement = statement.where(
+            or_(UserArticleState.is_read.is_(False), UserArticleState.article_id.is_(None))
+        )
 
-    articles = db.execute(statement).scalars().all()
+    rows = db.execute(statement.add_columns(UserArticleState.is_read)).all()
     return [
         {
             "id": str(article.id),
@@ -44,28 +94,19 @@ def list_articles(status_filter: str = "all", db: Session = Depends(get_db)):
             "reading_recommendation": article.ai_analysis.reading_recommendation.value
             if article.ai_analysis and article.ai_analysis.reading_recommendation
             else None,
-            "is_read": article.is_read,
+            "is_read": bool(is_read),
         }
-        for article in articles
+        for article, is_read in rows
     ]
 
 
 @router.get("/{article_id}")
-def get_article(article_id: UUID, db: Session = Depends(get_db)):
-    article = db.execute(
-        select(Article)
-        .where(Article.id == article_id)
-        .options(
-            joinedload(Article.feed),
-            joinedload(Article.content),
-            joinedload(Article.ai_analysis),
-        )
-    ).scalar_one_or_none()
-    if article is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="article not found",
-        )
+def get_article(
+    article_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    article = get_subscribed_article_or_404(article_id, current_user, db)
 
     return {
         "id": str(article.id),
@@ -87,37 +128,33 @@ def get_article(article_id: UUID, db: Session = Depends(get_db)):
 
 
 @router.post("/{article_id}/read", status_code=status.HTTP_204_NO_CONTENT)
-def mark_read(article_id: UUID, db: Session = Depends(get_db)):
-    article = db.get(Article, article_id)
-    if article is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="article not found",
-        )
-    article.is_read = True
-    db.commit()
+def mark_read(
+    article_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    get_subscribed_article_or_404(article_id, current_user, db)
+    set_read_state(db, current_user, article_id, True)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/{article_id}/unread", status_code=status.HTTP_204_NO_CONTENT)
-def mark_unread(article_id: UUID, db: Session = Depends(get_db)):
-    article = db.get(Article, article_id)
-    if article is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="article not found",
-        )
-    article.is_read = False
-    db.commit()
+def mark_unread(
+    article_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    get_subscribed_article_or_404(article_id, current_user, db)
+    set_read_state(db, current_user, article_id, False)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/{article_id}/reanalyze", status_code=status.HTTP_202_ACCEPTED)
-def reanalyze(article_id: UUID, db: Session = Depends(get_db)):
-    if db.get(Article, article_id) is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="article not found",
-        )
+def reanalyze(
+    article_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    get_subscribed_article_or_404(article_id, current_user, db)
     analyze_article_task.delay(str(article_id))
     return {"status": "queued"}

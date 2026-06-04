@@ -1,13 +1,24 @@
 import enum
 import uuid
-from datetime import datetime
+from datetime import UTC, date, datetime, time
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    Date,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    Time,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 def utcnow() -> datetime:
-    return datetime.utcnow()
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 class Base(DeclarativeBase):
@@ -72,7 +83,6 @@ class Article(Base):
     summary_from_feed: Mapped[str | None] = mapped_column(Text, nullable=True)
     cover_image_url: Mapped[str | None] = mapped_column(String(2000), nullable=True)
     guid: Mapped[str | None] = mapped_column(String(2000), nullable=True, index=True)
-    is_read: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     feed: Mapped[Feed] = relationship(back_populates="articles")
@@ -132,3 +142,107 @@ class ArticleAIAnalysis(Base):
     )
 
     article: Mapped[Article] = relationship(back_populates="ai_analysis")
+
+
+class EmailDigestSetting(Base):
+    __tablename__ = "email_digest_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    recipient_email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    send_interval_days: Mapped[int] = mapped_column(Integer, default=1)
+    send_time: Mapped[time] = mapped_column(Time(), default=lambda: time(hour=8, minute=0))
+    last_run_date: Mapped[date | None] = mapped_column(Date(), nullable=True)
+    last_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_attempted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    last_send_status: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    last_send_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    last_sent_article_count: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utcnow,
+        onupdate=utcnow,
+    )
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(String(512))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    sessions: Mapped[list["Session"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    feed_subscriptions: Mapped[list["UserFeedSubscription"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    article_states: Mapped[list["UserArticleState"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+
+class Session(Base):
+    __tablename__ = "sessions"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        index=True,
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    user: Mapped[User] = relationship(back_populates="sessions")
+
+
+class UserFeedSubscription(Base):
+    __tablename__ = "user_feed_subscriptions"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    feed_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("feeds.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    user: Mapped[User] = relationship(back_populates="feed_subscriptions")
+    feed: Mapped[Feed] = relationship()
+
+
+class UserArticleState(Base):
+    __tablename__ = "user_article_states"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    article_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("articles.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utcnow,
+        onupdate=utcnow,
+    )
+
+    user: Mapped[User] = relationship(back_populates="article_states")
+    article: Mapped[Article] = relationship()

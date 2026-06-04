@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from urllib.request import Request, urlopen
 from uuid import UUID
 
@@ -7,7 +7,7 @@ import feedparser
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from app.models import Article, ArticleAIAnalysis, ArticleContent, Feed
+from app.models import Article, ArticleAIAnalysis, ArticleContent, Feed, User, UserFeedSubscription
 
 
 @dataclass(frozen=True)
@@ -70,8 +70,17 @@ def fetch_feed_xml(url: str) -> str:
         return response.read().decode("utf-8", errors="replace")
 
 
-def list_feeds_for_api(db: Session) -> list[dict]:
-    feeds = db.execute(select(Feed).order_by(Feed.created_at.desc())).scalars().all()
+def list_feeds_for_api(db: Session, user: User) -> list[dict]:
+    feeds = (
+        db.execute(
+            select(Feed)
+            .join(UserFeedSubscription, UserFeedSubscription.feed_id == Feed.id)
+            .where(UserFeedSubscription.user_id == user.id)
+            .order_by(UserFeedSubscription.created_at.desc())
+        )
+        .scalars()
+        .all()
+    )
     return [
         {
             "id": str(feed.id),
@@ -85,20 +94,25 @@ def list_feeds_for_api(db: Session) -> list[dict]:
     ]
 
 
-def add_feed_from_url(db: Session, url: str) -> Feed:
-    parsed = parse_feed_items(fetch_feed_xml(url))
+def add_feed_from_url(db: Session, url: str, user: User) -> Feed:
     feed = db.execute(select(Feed).where(Feed.url == url)).scalar_one_or_none()
+    new_articles: list[Article] = []
+
     if feed is None:
+        parsed = parse_feed_items(fetch_feed_xml(url))
         feed = Feed(url=url, title=parsed.feed_title)
         db.add(feed)
+        feed.title = parsed.feed_title
+        feed.site_url = parsed.site_url
+        feed.favicon_url = f"{parsed.site_url.rstrip('/')}/favicon.ico" if parsed.site_url else None
+        feed.last_fetched_at = datetime.now(UTC).replace(tzinfo=None)
+        db.flush()
+        new_articles = upsert_feed_articles(db, feed, parsed)
 
-    feed.title = parsed.feed_title
-    feed.site_url = parsed.site_url
-    feed.favicon_url = f"{parsed.site_url.rstrip('/')}/favicon.ico" if parsed.site_url else None
-    feed.last_fetched_at = datetime.utcnow()
-    db.flush()
+    subscription = db.get(UserFeedSubscription, (user.id, feed.id))
+    if subscription is None:
+        db.add(UserFeedSubscription(user_id=user.id, feed_id=feed.id))
 
-    new_articles = upsert_feed_articles(db, feed, parsed)
     db.commit()
     enqueue_extraction(new_articles)
     return feed
@@ -113,7 +127,7 @@ def refresh_feed_by_id(db: Session, feed_id: UUID) -> int:
     feed.title = parsed.feed_title
     feed.site_url = parsed.site_url
     feed.favicon_url = f"{parsed.site_url.rstrip('/')}/favicon.ico" if parsed.site_url else None
-    feed.last_fetched_at = datetime.utcnow()
+    feed.last_fetched_at = datetime.now(UTC).replace(tzinfo=None)
     new_articles = upsert_feed_articles(db, feed, parsed)
     db.commit()
     enqueue_extraction(new_articles)
@@ -124,6 +138,17 @@ def delete_feed_by_id(db: Session, feed_id: UUID) -> None:
     feed = db.get(Feed, feed_id)
     if feed is not None:
         db.delete(feed)
+        db.commit()
+
+
+def user_is_subscribed_to_feed(db: Session, user: User, feed_id: UUID) -> bool:
+    return db.get(UserFeedSubscription, (user.id, feed_id)) is not None
+
+
+def delete_feed_subscription(db: Session, feed_id: UUID, user: User) -> None:
+    subscription = db.get(UserFeedSubscription, (user.id, feed_id))
+    if subscription is not None:
+        db.delete(subscription)
         db.commit()
 
 
@@ -154,7 +179,6 @@ def upsert_feed_articles(db: Session, feed: Feed, parsed: ParsedFeed) -> list[Ar
             summary_from_feed=item.summary_from_feed,
             cover_image_url=item.cover_image_url,
             guid=item.guid,
-            is_read=False,
         )
         db.add(article)
         db.flush()

@@ -6,7 +6,7 @@ Create Date: 2026-06-04 00:00:00.000000
 """
 
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import UTC, datetime
 import os
 import uuid
 
@@ -90,7 +90,7 @@ def _migrate_existing_data() -> None:
         )
 
     user_id = uuid.uuid4()
-    now = datetime.utcnow()
+    now = datetime.now(UTC).replace(tzinfo=None)
     bind.execute(
         sa.text(
             """

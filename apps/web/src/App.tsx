@@ -1,4 +1,12 @@
-import { Link, Outlet, useLocation } from "react-router-dom"
+import { useMutation, useQuery } from "@tanstack/react-query"
+import { LogOutIcon } from "lucide-react"
+import { Link, Outlet, useLocation, useNavigate } from "react-router-dom"
+
+import { EmailDigestSettingsDialog } from "@/components/email-digest-settings-dialog"
+import { Button } from "@/components/ui/button"
+import { getCurrentUser, logout } from "@/lib/auth"
+import { queryClient } from "@/lib/query-client"
+import { queryKeys } from "@/lib/query-keys"
 
 function navLinkClassName(active: boolean) {
   return active
@@ -7,8 +15,21 @@ function navLinkClassName(active: boolean) {
 }
 
 export function App() {
+  const navigate = useNavigate()
   const location = useLocation()
   const isWorkbench = location.pathname === "/articles"
+  const meQuery = useQuery({
+    queryKey: queryKeys.auth.me,
+    queryFn: getCurrentUser,
+    retry: false,
+  })
+  const logoutMutation = useMutation({
+    mutationFn: logout,
+    onSettled: () => {
+      queryClient.clear()
+      navigate("/login", { replace: true })
+    },
+  })
 
   return (
     <>
@@ -32,6 +53,22 @@ export function App() {
             >
               Feed
             </Link>
+          </div>
+          <div className="ml-auto flex min-w-0 items-center gap-2">
+            <span className="hidden truncate text-sm text-muted-foreground sm:block">
+              {meQuery.data?.email}
+            </span>
+            <EmailDigestSettingsDialog />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label="退出登录"
+              loading={logoutMutation.isPending}
+              onClick={() => logoutMutation.mutate()}
+            >
+              <LogOutIcon aria-hidden="true" className="size-4" />
+            </Button>
           </div>
         </nav>
       </header>

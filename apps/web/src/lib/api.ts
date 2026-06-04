@@ -38,6 +38,27 @@ export type Feed = {
   created_at?: string;
 };
 
+export type EmailDigestSettings = {
+  recipient_email: string | null;
+  enabled: boolean;
+  send_interval_days: number;
+  send_time: string;
+  timezone: "Asia/Shanghai";
+  last_run_date: string | null;
+  last_sent_at: string | null;
+  last_attempted_at: string | null;
+  last_send_status: string | null;
+  last_send_error: string | null;
+  last_sent_article_count: number;
+};
+
+export type EmailDigestSettingsUpdate = {
+  recipient_email: string | null;
+  enabled: boolean;
+  send_interval_days: number;
+  send_time: string;
+};
+
 async function parseResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const message = await response.text().catch(() => "");
@@ -52,7 +73,9 @@ async function parseResponse<T>(response: Response): Promise<T> {
 }
 
 export async function apiGet<T>(path: string): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`);
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    credentials: "include",
+  });
   return parseResponse<T>(response);
 }
 
@@ -62,6 +85,20 @@ export async function apiPost<T = unknown>(
 ): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: "POST",
+    credentials: "include",
+    headers: body ? { "Content-Type": "application/json" } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  return parseResponse<T>(response);
+}
+
+export async function apiPut<T = unknown>(
+  path: string,
+  body?: unknown,
+): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: "PUT",
     headers: body ? { "Content-Type": "application/json" } : undefined,
     body: body ? JSON.stringify(body) : undefined,
   });
@@ -72,6 +109,7 @@ export async function apiPost<T = unknown>(
 export async function apiDelete<T = unknown>(path: string): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: "DELETE",
+    credentials: "include",
   });
 
   return parseResponse<T>(response);

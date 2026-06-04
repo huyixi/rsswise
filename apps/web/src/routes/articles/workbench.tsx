@@ -1,28 +1,21 @@
 import { useEffect, useRef } from "react"
 import { useMutation, useQuery } from "@tanstack/react-query"
-import { useSearchParams } from "react-router-dom"
-import {
-  SparklesIcon,
-  ExternalLinkIcon,
-  BookOpenIcon,
-  InboxIcon,
-} from "lucide-react"
+import { useNavigate, useSearchParams } from "react-router-dom"
+import { SparklesIcon, BookOpenIcon, InboxIcon } from "lucide-react"
 
-import { MarkdownContent } from "@/components/markdown-content"
 import { RecommendationBadge } from "@/components/recommendation-badge"
 import { Spinner } from "@/components/ui/spinner"
+import { useIsMobile } from "@/hooks/use-media-query"
 import { cn } from "@/lib/utils"
 import { apiGet, apiPost, type ArticleDetail, type ArticleListItem } from "@/lib/api"
 import { queryClient } from "@/lib/query-client"
 import { queryKeys } from "@/lib/query-keys"
-
-function formatDate(value: string | null) {
-  if (!value) return "未发布"
-  return new Intl.DateTimeFormat("zh-CN", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value))
-}
+import {
+  ArticleAiSummary,
+  ArticleBody,
+  ArticleHeader,
+  formatArticleDate,
+} from "./components"
 
 function normalizeStatus(value: string | null) {
   return value === "read" || value === "unread" ? value : "all"
@@ -134,7 +127,8 @@ function ArticleListPanel({
                           {article.title}
                         </p>
                         <p className="mt-1 truncate text-xs text-muted-foreground">
-                          {article.source_title} · {formatDate(article.published_at)}
+                          {article.source_title} ·{" "}
+                          {formatArticleDate(article.published_at)}
                         </p>
                         {article.one_sentence_summary && (
                           <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
@@ -216,31 +210,8 @@ function ArticleContentPanel({
   return (
     <main className="min-w-0 flex-1 overflow-y-auto bg-card">
       <article className="mx-auto flex max-w-3xl flex-col gap-6 px-6 py-8 md:px-8">
-        <header className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <span className="font-medium text-foreground">{article.source_title}</span>
-            <span aria-hidden="true">/</span>
-            <span>{formatDate(article.published_at)}</span>
-          </div>
-
-          <h1 className="text-2xl font-semibold leading-tight text-foreground">
-            {article.title}
-          </h1>
-
-          <a
-            href={article.url}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex w-fit items-center gap-1 text-sm font-medium text-foreground underline-offset-4 hover:underline"
-          >
-            阅读原文
-            <ExternalLinkIcon aria-hidden="true" className="size-3.5" />
-          </a>
-        </header>
-
-        <div className="border-t pt-6">
-          <MarkdownContent markdown={article.content_markdown ?? "正文处理中……"} />
-        </div>
+        <ArticleHeader article={article} />
+        <ArticleBody contentMarkdown={article.content_markdown} />
       </article>
     </main>
   )
@@ -270,40 +241,17 @@ function AISummaryPanel({
   }
 
   return (
-      <aside className="flex w-[340px] shrink-0 flex-col border-l bg-background max-xl:w-[300px] max-lg:w-full max-lg:border-l-0 max-lg:border-t">
-        <div className="flex-1 overflow-y-auto px-5 py-4">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Spinner />
-            </div>
-          ) : article?.reading_recommendation ? (
-            <div className="flex flex-col gap-3 rounded-lg border bg-card p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-muted-foreground">阅读建议</span>
-                <RecommendationBadge value={article.reading_recommendation} />
-              </div>
-
-              {article.one_sentence_summary && (
-                <div>
-                  <p className="mb-1 text-xs font-medium text-muted-foreground">摘要</p>
-                  <p className="text-sm leading-relaxed text-foreground">
-                    {article.one_sentence_summary}
-                  </p>
-                </div>
-              )}
-
-              {article.reading_reason && (
-                <div>
-                  <p className="mb-1 text-xs font-medium text-muted-foreground">理由</p>
-                  <p className="text-sm leading-relaxed text-muted-foreground">
-                    {article.reading_reason}
-                  </p>
-                </div>
-              )}
-            </div>
-          ) : null}
-        </div>
-      </aside>
+    <aside className="flex w-[340px] shrink-0 flex-col border-l bg-background max-xl:w-[300px] max-lg:w-full max-lg:border-l-0 max-lg:border-t">
+      <div className="flex-1 overflow-y-auto px-5 py-4">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Spinner />
+          </div>
+        ) : article ? (
+          <ArticleAiSummary article={article} />
+        ) : null}
+      </div>
+    </aside>
   )
 }
 
@@ -311,6 +259,8 @@ export function ArticleWorkbenchPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const selectedId = searchParams.get("id")
   const status = normalizeStatus(searchParams.get("status"))
+  const navigate = useNavigate()
+  const isMobile = useIsMobile()
 
   const markedReadIdRef = useRef<string | null>(null)
 
@@ -325,7 +275,7 @@ export function ArticleWorkbenchPage() {
   const articleQuery = useQuery({
     queryKey: queryKeys.articles.detail(selectedId ?? ""),
     queryFn: () => apiGet<ArticleDetail>(`/articles/${selectedId}`),
-    enabled: Boolean(selectedId),
+    enabled: Boolean(selectedId) && !isMobile,
     refetchInterval: (query) => {
       const data = query.state.data
       if (!data) return false
@@ -352,12 +302,17 @@ export function ArticleWorkbenchPage() {
   })
 
   useEffect(() => {
-    if (!selectedId || markedReadIdRef.current === selectedId) return
+    if (isMobile || !selectedId || markedReadIdRef.current === selectedId) return
     markedReadIdRef.current = selectedId
     markReadMutation.mutate(selectedId)
-  }, [selectedId, markReadMutation])
+  }, [isMobile, selectedId, markReadMutation])
 
   function handleSelectArticle(id: string) {
+    if (isMobile) {
+      navigate(`/articles/${id}`)
+      return
+    }
+
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev)
       next.set("id", id)
@@ -376,6 +331,23 @@ export function ArticleWorkbenchPage() {
       next.delete("id")
       return next
     })
+  }
+
+  if (isMobile) {
+    return (
+      <div className="min-h-[calc(100vh-49px)] bg-background">
+        <ArticleListPanel
+          articles={articlesQuery.data}
+          selectedId={selectedId}
+          onSelect={handleSelectArticle}
+          status={status}
+          onStatusChange={handleStatusChange}
+          isLoading={articlesQuery.isLoading}
+          isError={articlesQuery.isError}
+          errorMessage={articlesQuery.error?.message ?? "加载文章列表失败"}
+        />
+      </div>
+    )
   }
 
   return (

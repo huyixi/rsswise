@@ -18,12 +18,12 @@ jobs:
       - name: Deploy to server
         uses: appleboy/ssh-action@v1
         with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
+          host: ${{ vars.DEPLOY_HOST }}
+          username: ${{ vars.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: |
             set -e
-            cd ${{ secrets.DEPLOY_PATH }}
+            cd ${{ vars.DEPLOY_PATH }}
             git pull --ff-only
             docker compose --env-file .env.compose.production -f docker-compose.prod.yml up -d --build --remove-orphans
             docker compose --env-file .env.compose.production -f docker-compose.prod.yml exec -T api uv run --no-sync alembic upgrade head

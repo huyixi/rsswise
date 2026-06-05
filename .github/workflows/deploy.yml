@@ -21,6 +21,7 @@ jobs:
           host: ${{ vars.DEPLOY_HOST }}
           username: ${{ vars.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: 443
           script: |
             set -e
             cd ${{ vars.DEPLOY_PATH }}

@@ -43,6 +43,14 @@ export function LoginPage() {
     })
   }
 
+  function handleDemoLogin() {
+    setError(null)
+    loginMutation.mutate({
+      email: "rss@huyixi.com",
+      password: "rss@huyixi.com",
+    })
+  }
+
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-sm flex-col justify-center gap-6 px-4">
       <div className="flex flex-col gap-2">
@@ -55,6 +63,9 @@ export function LoginPage() {
         {error ? <p className="text-sm text-destructive-foreground">{error}</p> : null}
         <Button type="submit" loading={loginMutation.isPending}>
           登录
+        </Button>
+        <Button type="button" variant="outline" onClick={handleDemoLogin} loading={loginMutation.isPending}>
+          体验 Demo
         </Button>
       </form>
       <p className="text-center text-sm text-muted-foreground">

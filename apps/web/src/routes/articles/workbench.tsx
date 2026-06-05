@@ -307,6 +307,52 @@ export function ArticleWorkbenchPage() {
     markReadMutation.mutate(selectedId)
   }, [isMobile, selectedId, markReadMutation])
 
+  useEffect(() => {
+    if (isMobile) return
+    if (!articlesQuery.data || articlesQuery.data.length === 0) return
+    if (selectedId) return
+
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      next.set("id", articlesQuery.data![0].id)
+      return next
+    })
+  }, [isMobile, articlesQuery.data, selectedId, setSearchParams])
+
+  useEffect(() => {
+    if (isMobile) return
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (!articlesQuery.data || articlesQuery.data.length === 0) return
+      if (!selectedId) return
+
+      const currentIndex = articlesQuery.data.findIndex((a) => a.id === selectedId)
+      if (currentIndex === -1) return
+
+      let nextIndex = currentIndex
+      if (event.key === "ArrowDown") {
+        nextIndex = Math.min(currentIndex + 1, articlesQuery.data.length - 1)
+      } else if (event.key === "ArrowUp") {
+        nextIndex = Math.max(currentIndex - 1, 0)
+      } else {
+        return
+      }
+
+      event.preventDefault()
+
+      if (nextIndex === currentIndex) return
+
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev)
+        next.set("id", articlesQuery.data![nextIndex].id)
+        return next
+      })
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [isMobile, articlesQuery.data, selectedId, setSearchParams])
+
   function handleSelectArticle(id: string) {
     if (isMobile) {
       navigate(`/articles/${id}`)

@@ -141,7 +141,7 @@ test("mobile article list opens standalone detail page", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "AI 总结" })).toBeVisible()
   await expect(page.getByText("这是一句话 AI 摘要")).toBeVisible()
   await expect(page.getByText("这篇文章和当前关注主题高度相关。")).toBeVisible()
-  await expect(page.getByRole("heading", { name: "正文标题" })).toBeVisible()
+  await expect(page.getByText("这是正文内容。")).toBeVisible()
   expect(readRequestCount).toBe(1)
 })
 
@@ -154,12 +154,12 @@ test("mobile detail shows AI summary before article body", async ({ page }) => {
   await page.goto("/articles/11111111-1111-1111-1111-111111111111")
 
   const aiBox = page.getByRole("heading", { name: "AI 总结" })
-  const bodyHeading = page.getByRole("heading", { name: "正文标题" })
+  const bodyContent = page.getByText("这是正文内容。")
   await expect(aiBox).toBeVisible()
-  await expect(bodyHeading).toBeVisible()
+  await expect(bodyContent).toBeVisible()
 
   const aiBoxTop = await aiBox.evaluate((node) => node.getBoundingClientRect().top)
-  const bodyTop = await bodyHeading.evaluate((node) =>
+  const bodyTop = await bodyContent.evaluate((node) =>
     node.getBoundingClientRect().top,
   )
   expect(aiBoxTop).toBeLessThan(bodyTop)
@@ -188,7 +188,7 @@ test("desktop workbench selects the first article by default", async ({ page }) 
 
   await expect(page).toHaveURL(new RegExp(`/articles\\?id=${firstArticleId}$`))
   await expect(page.getByRole("heading", { name: "移动端文章详情测试" })).toBeVisible()
-  await expect(page.getByRole("heading", { name: "正文标题" })).toBeVisible()
+  await expect(page.getByText("这是正文内容。")).toBeVisible()
 })
 
 test("desktop workbench arrow keys move selection without wrapping", async ({
@@ -212,7 +212,7 @@ test("desktop workbench arrow keys move selection without wrapping", async ({
   await page.keyboard.press("ArrowDown")
   await expect(page).toHaveURL(new RegExp(`/articles\\?id=${secondArticleId}$`))
   await expect(page.getByRole("heading", { name: "第二篇桌面键盘测试" })).toBeVisible()
-  await expect(page.getByRole("heading", { name: "第二篇正文" })).toBeVisible()
+  await expect(page.getByText("这是第二篇正文内容。")).toBeVisible()
 
   await page.keyboard.press("ArrowDown")
   await expect(page).toHaveURL(new RegExp(`/articles\\?id=${secondArticleId}$`))
@@ -221,7 +221,7 @@ test("desktop workbench arrow keys move selection without wrapping", async ({
   await page.keyboard.press("ArrowUp")
   await expect(page).toHaveURL(new RegExp(`/articles\\?id=${firstArticleId}$`))
   await expect(page.getByRole("heading", { name: "移动端文章详情测试" })).toBeVisible()
-  await expect(page.getByRole("heading", { name: "正文标题" })).toBeVisible()
+  await expect(page.getByText("这是正文内容。")).toBeVisible()
 })
 
 test("desktop workbench list click keeps query-param detail behavior", async ({

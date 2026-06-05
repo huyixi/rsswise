@@ -1,8 +1,11 @@
 import { expect, test, type Page } from "@playwright/test"
 
+const firstArticleId = "11111111-1111-1111-1111-111111111111"
+const secondArticleId = "22222222-2222-2222-2222-222222222222"
+
 const articleList = [
   {
-    id: "11111111-1111-1111-1111-111111111111",
+    id: firstArticleId,
     title: "移动端文章详情测试",
     source_title: "RSSWise 测试源",
     published_at: "2026-06-04T08:00:00Z",
@@ -10,10 +13,19 @@ const articleList = [
     reading_recommendation: "deep_read",
     is_read: false,
   },
+  {
+    id: secondArticleId,
+    title: "第二篇桌面键盘测试",
+    source_title: "RSSWise 测试源",
+    published_at: "2026-06-05T08:00:00Z",
+    one_sentence_summary: "这是第二篇文章的一句话摘要",
+    reading_recommendation: "skim",
+    is_read: false,
+  },
 ]
 
 const articleDetail = {
-  id: "11111111-1111-1111-1111-111111111111",
+  id: firstArticleId,
   title: "移动端文章详情测试",
   source_title: "RSSWise 测试源",
   published_at: "2026-06-04T08:00:00Z",
@@ -24,6 +36,28 @@ const articleDetail = {
   content_markdown: "## 正文标题\n\n这是正文内容。",
   extraction_status: "success",
   analysis_status: "success",
+}
+
+const secondArticleDetail = {
+  id: secondArticleId,
+  title: "第二篇桌面键盘测试",
+  source_title: "RSSWise 测试源",
+  published_at: "2026-06-05T08:00:00Z",
+  url: "https://example.com/desktop-keyboard-article",
+  one_sentence_summary: "这是第二篇文章的一句话摘要",
+  reading_recommendation: "skim",
+  reading_reason: "这篇文章用于验证桌面端键盘切换。",
+  content_markdown: "## 第二篇正文\n\n这是第二篇正文内容。",
+  extraction_status: "success",
+  analysis_status: "success",
+}
+
+const articleDetails: Record<
+  string,
+  typeof articleDetail | typeof secondArticleDetail
+> = {
+  [firstArticleId]: articleDetail,
+  [secondArticleId]: secondArticleDetail,
 }
 
 async function mockAuthenticatedUser(page: Page) {
@@ -39,27 +73,32 @@ async function mockArticleRoutes(page: Page) {
     await route.fulfill({ json: articleList })
   })
 
-  await page.route(
-    "**/api/articles/11111111-1111-1111-1111-111111111111",
-    async (route) => {
-      if (route.request().method() === "GET") {
-        await route.fulfill({ json: articleDetail })
-        return
-      }
-
+  await page.route(/\/api\/articles\/[^/]+$/, async (route) => {
+    if (route.request().method() !== "GET") {
       await route.fallback()
-    },
-  )
+      return
+    }
+
+    const articleId = new URL(route.request().url()).pathname.split("/").at(-1)
+    const detail = articleId ? articleDetails[articleId] : undefined
+
+    if (!detail) {
+      await route.fallback()
+      return
+    }
+
+    await route.fulfill({ json: detail })
+  })
 }
 
-async function mockReadRoute(page: Page, onRead?: () => void) {
-  await page.route(
-    "**/api/articles/11111111-1111-1111-1111-111111111111/read",
-    async (route) => {
-      onRead?.()
-      await route.fulfill({ status: 204, body: "" })
-    },
-  )
+async function mockReadRoute(page: Page, onRead?: (articleId: string) => void) {
+  await page.route(/\/api\/articles\/[^/]+\/read$/, async (route) => {
+    expect(route.request().method()).toBe("POST")
+    const parts = new URL(route.request().url()).pathname.split("/")
+    const articleId = parts.at(-2) ?? ""
+    onRead?.(articleId)
+    await route.fulfill({ status: 204, body: "" })
+  })
 }
 
 test("article list has required filters", async ({ page }) => {
@@ -137,6 +176,52 @@ test("desktop article detail route redirects to workbench selection", async ({ p
   await expect(page).toHaveURL(
     /\/articles\?id=11111111-1111-1111-1111-111111111111$/,
   )
+})
+
+test("desktop workbench selects the first article by default", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await mockAuthenticatedUser(page)
+  await mockArticleRoutes(page)
+  await mockReadRoute(page)
+
+  await page.goto("/articles")
+
+  await expect(page).toHaveURL(new RegExp(`/articles\\?id=${firstArticleId}$`))
+  await expect(page.getByRole("heading", { name: "移动端文章详情测试" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "正文标题" })).toBeVisible()
+})
+
+test("desktop workbench arrow keys move selection without wrapping", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await mockAuthenticatedUser(page)
+  await mockArticleRoutes(page)
+  await mockReadRoute(page)
+
+  await page.goto(`/articles?id=${firstArticleId}`)
+  await expect(page.getByRole("heading", { name: "移动端文章详情测试" })).toBeVisible()
+  await expect(
+    page.getByRole("button", { name: /第二篇桌面键盘测试/ }),
+  ).toBeVisible()
+
+  await page.keyboard.press("ArrowUp")
+  await expect(page).toHaveURL(new RegExp(`/articles\\?id=${firstArticleId}$`))
+  await expect(page.getByRole("heading", { name: "移动端文章详情测试" })).toBeVisible()
+
+  await page.keyboard.press("ArrowDown")
+  await expect(page).toHaveURL(new RegExp(`/articles\\?id=${secondArticleId}$`))
+  await expect(page.getByRole("heading", { name: "第二篇桌面键盘测试" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "第二篇正文" })).toBeVisible()
+
+  await page.keyboard.press("ArrowDown")
+  await expect(page).toHaveURL(new RegExp(`/articles\\?id=${secondArticleId}$`))
+  await expect(page.getByRole("heading", { name: "第二篇桌面键盘测试" })).toBeVisible()
+
+  await page.keyboard.press("ArrowUp")
+  await expect(page).toHaveURL(new RegExp(`/articles\\?id=${firstArticleId}$`))
+  await expect(page.getByRole("heading", { name: "移动端文章详情测试" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "正文标题" })).toBeVisible()
 })
 
 test("desktop workbench list click keeps query-param detail behavior", async ({

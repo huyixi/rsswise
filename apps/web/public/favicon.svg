@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="RSS icon vector"><metadata><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:dc="http://purl.org/dc/elements/1.1/"><rdf:Description><dc:creator>RealFaviconGenerator</dc:creator><dc:source>https://realfavicongenerator.net</dc:source></rdf:Description></rdf:RDF></metadata><defs>
+    <clipPath id="rounded">
+      <rect width="512" height="512" rx="86" ry="86"></rect>
+    </clipPath>
+    <linearGradient id="base" x1="72" y1="28" x2="470" y2="486" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ff8500"></stop>
+      <stop offset="0.55" stop-color="#ff4b00"></stop>
+      <stop offset="1" stop-color="#ff0800"></stop>
+    </linearGradient>
+  </defs><g clip-path="url(#rounded)">
+    <rect width="512" height="512" fill="url(#base)"></rect>
+
+    <path d="M0 0H384C447 0 468 29 454 80C442 123 414 144 372 144H218C139 144 71 188 31 255C6 298 0 346 0 396V0Z" fill="#ff8700"></path>
+
+    <path d="M512 84C505 158 467 215 400 240C335 264 296 271 258 308C230 336 221 382 237 424C256 474 295 512 354 512H512V84Z" fill="#ff0500"></path>
+
+    <path d="M0 512V380C0 286 53 199 136 162C205 131 281 155 328 217C374 279 366 366 410 430C432 462 469 489 512 506V512H0Z" fill="#ff4a00" opacity="0.86"></path>
+
+    <path d="M383 0H512V173C490 211 454 236 400 247C345 258 299 249 260 221C231 200 218 171 218 144H372C417 144 447 123 455 80C464 29 440 0 383 0Z" fill="#ff4a00" opacity="0.9"></path>
+
+    <circle cx="144" cy="368" r="32" fill="#fff"></circle>
+    <path d="M144 256C206 256 256 306 256 368" fill="none" stroke="#fff" stroke-width="64" stroke-linecap="round"></path>
+    <path d="M144 144C268 144 368 244 368 368" fill="none" stroke="#fff" stroke-width="64" stroke-linecap="round"></path>
+  </g><style>@media (prefers-color-scheme: light) { :root { filter: none; } }
+@media (prefers-color-scheme: dark) { :root { filter: none; } }
+</style></svg>

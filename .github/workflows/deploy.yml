@@ -39,7 +39,7 @@ jobs:
           host: ${{ vars.DEPLOY_HOST }}
           username: ${{ vars.DEPLOY_USER }}
           port: ${{ vars.DEPLOY_PORT }}
-          key_path: ~/.ssh/github_deploy
+          key_path: /home/runner/.ssh/github_deploy
           script: |
             set -e
             cd ${{ vars.DEPLOY_PATH }}

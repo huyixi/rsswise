@@ -46,8 +46,8 @@ export function LoginPage() {
   function handleDemoLogin() {
     setError(null)
     loginMutation.mutate({
-      email: "rss@huyixi.com",
-      password: "rss@huyixi.com",
+      email: "demo@huyixi.com",
+      password: "demo@huyixi.com",
     })
   }
 

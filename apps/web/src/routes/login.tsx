@@ -65,7 +65,7 @@ export function LoginPage() {
           登录
         </Button>
         <Button type="button" variant="outline" onClick={handleDemoLogin} loading={loginMutation.isPending}>
-          体验 Demo
+          立即体验
         </Button>
       </form>
       <p className="text-center text-sm text-muted-foreground">

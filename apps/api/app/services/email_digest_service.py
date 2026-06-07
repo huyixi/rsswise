@@ -60,6 +60,7 @@ def run_due_email_digest(db: Session, *, now: datetime | None = None) -> str:
     setting = get_or_create_email_digest_setting(db)
 
     setting.last_attempted_at = current_time
+    setting.last_send_error = None
     if not setting.enabled:
         setting.last_send_status = "skipped_disabled"
         db.commit()

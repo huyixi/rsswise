@@ -4,6 +4,14 @@ import { MailIcon, SettingsIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
+  Combobox,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+  ComboboxPopup,
+} from "@/components/ui/combobox";
+import {
   Dialog,
   DialogDescription,
   DialogFooter,
@@ -58,6 +66,13 @@ const DEFAULT_SETTINGS: EmailDigestSettings = {
   last_send_error: null,
   last_sent_article_count: 0,
 };
+
+const INTERVAL_VALUES = [1, 2, 3, 4, 5, 6, 7, 15, 30] as const;
+
+const INTERVAL_ITEMS = INTERVAL_VALUES.map((v) => ({
+  value: v,
+  label: `${v} 天`,
+}));
 
 function settingsKey(settings: EmailDigestSettings) {
   return [
@@ -145,15 +160,28 @@ function EmailDigestSettingsForm({
         </Field>
 
         <Field>
-          <FieldLabel htmlFor="email-digest-interval">发送间隔天数</FieldLabel>
-          <Input
-            id="email-digest-interval"
-            type="number"
-            min={1}
-            max={30}
+          <FieldLabel>发送间隔天数</FieldLabel>
+          <Combobox
+            items={INTERVAL_ITEMS}
             value={sendIntervalDays}
-            onChange={(event) => setSendIntervalDays(Number(event.target.value))}
-          />
+            onValueChange={(value) => setSendIntervalDays(value as number)}
+          >
+            <ComboboxInput
+              id="email-digest-interval"
+              placeholder="选择天数..."
+              showClear={false}
+            />
+            <ComboboxPopup>
+              <ComboboxEmpty>无匹配结果</ComboboxEmpty>
+              <ComboboxList>
+                {(item) => (
+                  <ComboboxItem key={item.value} value={item.value}>
+                    {item.label}
+                  </ComboboxItem>
+                )}
+              </ComboboxList>
+            </ComboboxPopup>
+          </Combobox>
           <FieldDescription>1 表示每天发送，7 表示每周发送。</FieldDescription>
         </Field>
 

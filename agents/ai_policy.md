@@ -1,289 +1,124 @@
 # AI Coding Policy
 
-本政策用于约束本项目中 AI 工具的使用方式，包括但不限于 ChatGPT、Claude Code、Codex、Cursor、Gemini CLI、Superpowers 以及其他 AI Coding Agent。
+This policy applies to contributors using AI tools to help write code, documentation, tests, plans, reviews, issues, or pull requests.
 
-AI 可以辅助生成代码、解释代码、补充测试、重构、编写文档和分析报错，但 AI 不能替代开发者对代码的理解、判断和责任。
+AI may assist development, but it does not own the change. Authors are responsible for the correctness, security, maintainability, and long-term impact of their changes.
 
-## 1. 基本原则
+**Do not commit or merge AI-assisted changes that you cannot explain, test, or maintain.**
 
-### 1.1 AI 可以辅助，但不能替代理解
+## Basic Rules
 
-所有提交到本项目的代码和文档，无论是否由 AI 辅助生成，最终都必须由开发者自行 review、理解和确认。
+Authors must review and understand all AI-assisted changes before committing or merging them.
 
-在提交代码前，开发者需要能够回答：
+AI-generated work should not be committed unless the author can explain:
 
-* 这个改动解决了什么问题？
-* 修改了哪些文件？
-* 每个主要文件为什么需要修改？
-* 核心逻辑是如何运行的？
-* 有哪些边界情况和失败路径？
-* 如果线上出现问题，应该如何排查或回滚？
+* What changed
+* Why it is needed
+* How it works
+* How it was verified
+* What risks remain
 
-如果无法回答以上问题，说明该改动还不应该提交。
+Authors must ensure that submitted work is original and does not knowingly include copied code from unknown or unverified sources.
 
-### 1.2 不理解的代码不能继续叠加复杂度
+When an AI agent drafts an issue, pull request, or response, and a human replies, the human operator must review and respond. AI may draft the reply, but a human must decide what to say.
 
-如果某个模块当前处于“不理解”或“半理解”状态，不应直接让 AI 在其上继续进行大规模重构或功能扩展。
+## High-Risk Changes
 
-这类模块应先进入理解流程：
+AI tools must not make broad changes to high-risk areas without first outputting a plan.
 
-1. 解释当前代码职责
-2. 梳理入口、出口、依赖和数据流
-3. 标记风险点和不确定点
-4. 补充必要测试
-5. 再进行修改
+High-risk areas include:
 
-### 1.3 Reviewer 不是 AI 输出的第一道检查
+* Authentication, authorization, and access control
+* Database schemas, migrations, data deletion, or irreversible data changes
+* Deployment, CI/CD, infrastructure, secrets, and production configuration
+* Payment, billing, quotas, or cost-related logic
+* User privacy, personal data, analytics, and logging
+* File uploads, storage, and user-generated content
+* Background jobs, queues, retries, and external API integrations when they affect production data, cost, privacy, or external systems
+* AI prompts, model selection, retrieval, caching, or evaluation when they affect product behavior, cost, or user-facing output
+* Security-sensitive dependencies, SDKs, middleware, or configuration
 
-即使项目只有自己一个人维护，也必须先完成自审。
+A broad change means any change that affects production behavior, data shape, deployment behavior, security boundaries, user data, external systems, cost, or multiple modules.
 
-不能采用以下流程：
-
-```text
-AI 生成代码 → 直接提交 / 直接部署
-```
-
-推荐流程是：
-
-```text
-AI 生成初稿 → 人工理解 → 人工修改 → 测试验证 → 提交 / 部署
-```
-
-## 2. 高风险区域
-
-以下区域属于高风险代码，不允许 AI 直接大范围修改。修改前必须先给出方案、风险点和验证方式。
-
-* 鉴权与权限判断
-* 数据库模型和数据库迁移
-* 数据删除、批量更新、数据清洗脚本
-* 部署脚本、CI/CD、Docker Compose、Nginx/Caddy 配置
-* 环境变量和密钥读取逻辑
-* Worker、定时任务、队列、重试机制
-* 支付、费用、调用成本相关逻辑
-* 文件上传、图片处理、对象存储
-* 时间、时区、定时执行逻辑
-* 用户隐私数据和日志记录
-* AI 调用、Prompt、RAG、向量检索、缓存策略
-
-涉及这些区域时，AI 必须先输出：
+Before modifying a high-risk area, AI tools must output:
 
 ```md
-## 修改前说明
+## Modification Plan
 
-### 当前代码的作用
+### Current behavior
 
-### 计划修改内容
+### Planned changes
 
-### 不会修改的内容
+### What will NOT be changed
 
-### 潜在风险
+### Potential risks
 
-### 需要人工确认的地方
+### Items requiring human confirmation
 
-### 验证命令
+### Verification commands
 ```
 
-确认后才能开始修改。
+Only after human confirmation may the modification proceed, unless the author has explicitly granted session-level approval.
 
-## 3. AI 修改代码的要求
+## Prohibited Actions
 
-每次 AI 辅助修改完成后，必须输出以下内容：
+AI tools must not:
+
+* Commit or push changes without explicit human approval
+* Modify or print secrets, access tokens, API keys, private credentials, or private configuration
+* Run destructive database commands without explicit human approval
+* Delete data, files, migrations, branches, or deployment configuration without explicit human approval
+* Change production deployment targets, domains, credentials, or environment variables without explicit human approval
+* Introduce third-party services, SDKs, paid APIs, analytics, or tracking tools without explaining cost, security, and privacy impact
+* Claim verification was completed when it was not actually run
+* Hide uncertainty behind vague language
+
+If uncertain, mark the relevant area as:
+
+```txt
+NEEDS HUMAN CONFIRMATION
+```
+
+## Required Summary
+
+After each AI-assisted modification, the agent must output:
 
 ```md
-## 修改总结
+## Modification Summary
 
-### 修改了哪些文件
+### Files changed
 
-### 每个文件为什么修改
+### Why each file was changed
 
-### 核心逻辑变化
+### Core logic changes
 
-### 风险点
+### Risks
 
-### 需要人工检查的地方
+### Items requiring manual review
 
-### 建议执行的验证命令
+### Suggested verification commands
 ```
 
-如果 AI 对某些代码没有把握，必须明确标记为：
+## Pull Request Note
 
-```text
-需要人工确认
-```
-
-不能用模糊表达掩盖不确定性，例如：
-
-```text
-应该没问题
-看起来合理
-理论上可以
-```
-
-## 4. 大改动必须分阶段
-
-对于跨多个模块的大改动，不能一次性完成所有修改。
-
-推荐分阶段：
-
-```text
-阶段 1：只分析，不修改
-阶段 2：制定修改方案
-阶段 3：小范围实现
-阶段 4：补充测试
-阶段 5：人工 review
-阶段 6：提交
-```
-
-推荐使用拆分提交：
-
-```text
-commit 1: ai-assisted initial implementation
-commit 2: manual review and cleanup
-commit 3: add tests and validation
-```
-
-如果不方便拆 commit，也至少要在提交信息中说明 AI 参与的范围。
-
-## 5. 代码理解债务
-
-如果某段代码已经存在但自己不能完全理解，应记录到：
-
-```text
-docs/code-understanding-debt.md
-```
-
-记录格式：
+For non-trivial AI-assisted changes, include a short note in the pull request, commit message, or development notes.
 
 ```md
-## 模块名称
+## AI Assistance
 
-状态：Green / Yellow / Red / Black
+AI tools were used for:
 
-### 文件
+- 
 
-### 当前理解
+Manual review performed:
 
-### 不确定点
+- 
 
-### 风险等级
+Verification:
 
-### 暂时规则
+- 
 
-### 下一步
+Risks or uncertain areas:
+
+- 
 ```
-
-状态说明：
-
-* Green：已理解，可以正常维护
-* Yellow：半理解，小改可以，大改前需要补测试
-* Red：不理解，高风险，禁止直接修改
-* Black：暂时冻结，涉及生产数据、部署、鉴权或回滚风险
-
-## 6. 测试与验证
-
-AI 生成的代码不能因为“看起来正确”就直接提交。
-
-提交前至少根据项目情况执行：
-
-```bash
-pnpm lint
-pnpm typecheck
-pnpm build
-pnpm test
-uv run pytest
-docker compose ps
-docker compose logs
-```
-
-实际命令以当前项目为准。
-
-如果无法运行测试或构建，必须在提交说明中写明：
-
-```text
-未验证项：
-- 未运行 xxx，原因是 xxx
-- 风险是 xxx
-- 后续需要 xxx
-```
-
-## 7. 不确定区域必须标记
-
-如果某段代码由 AI 辅助生成，并且开发者不完全确定，应在以下位置之一标记：
-
-* PR 描述
-* commit message
-* review comment
-* 代码注释
-* docs/code-understanding-debt.md
-
-示例：
-
-```md
-这部分由 AI 辅助生成，已人工 review，但仍需重点确认生产环境下数据库迁移是否安全。
-```
-
-## 8. 原创性与来源
-
-提交到本项目的代码必须是可以合法使用的原创实现。
-
-不能提交：
-
-* 来路不明的代码
-* 违反许可证的代码
-* 从第三方项目直接复制但未确认授权的代码
-* 包含隐私、密钥、内部数据的代码
-* AI 可能生成但自己无法确认来源的实现
-
-使用 AI 不改变提交者对代码来源和合法性的责任。
-
-## 9. 人类反馈必须由人类判断
-
-当收到他人的 review、issue、bug 反馈、用户反馈或线上报错时，可以使用 AI 辅助分析，但最终回复、判断和决策必须由开发者自己完成。
-
-不能让 AI 自动替代开发者回应真实的人类反馈。
-
-推荐流程：
-
-```text
-人类反馈 → AI 辅助分析 → 开发者判断 → 开发者回复 / 修改
-```
-
-## 10. 默认给 AI Agent 的规则
-
-在本项目中使用 AI Agent 时，默认遵守以下规则：
-
-```md
-当前项目存在代码理解债务，因此你必须遵守：
-
-1. 默认不要进行大范围重构。
-2. 修改前先解释你将要改的模块。
-3. 对不确定的代码必须标记为「需要人工确认」。
-4. 涉及以下区域时，必须先给方案，不得直接修改：
-   - 数据库迁移
-   - 鉴权
-   - 部署脚本
-   - 环境变量
-   - 数据删除
-   - Worker / 定时任务
-5. 每次修改后必须输出：
-   - 修改了哪些文件
-   - 为什么修改
-   - 风险点
-   - 验证命令
-   - 建议人工检查的地方
-6. 不要为了通过测试而修改测试本身，除非明确说明原因。
-7. 不确定就说不确定，不要假装确定。
-```
-
-## 11. 最终原则
-
-AI 可以提高开发速度，但不能稀释工程责任。
-
-本项目接受 AI 辅助开发，但不接受：
-
-* 不理解就提交
-* 不验证就部署
-* 不标记风险就修改高风险代码
-* 用更多 AI 生成掩盖已有理解债务
-
-最终提交的代码，必须是开发者能够理解、解释、验证和维护的代码。

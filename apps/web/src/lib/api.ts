@@ -61,7 +61,18 @@ export type EmailDigestSettingsUpdate = {
 
 async function parseResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
-    const message = await response.text().catch(() => "");
+    const rawMessage = await response.text().catch(() => "");
+    let message = rawMessage;
+    if (rawMessage) {
+      try {
+        const data = JSON.parse(rawMessage) as { detail?: unknown };
+        if (typeof data.detail === "string") {
+          message = data.detail;
+        }
+      } catch {
+        message = rawMessage;
+      }
+    }
     throw new Error(message || `API request failed: ${response.status}`);
   }
 
@@ -99,6 +110,7 @@ export async function apiPut<T = unknown>(
 ): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: "PUT",
+    credentials: "include",
     headers: body ? { "Content-Type": "application/json" } : undefined,
     body: body ? JSON.stringify(body) : undefined,
   });

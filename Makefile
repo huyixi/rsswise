@@ -1,4 +1,4 @@
-.PHONY: help install dev-up dev-down dev-logs dev-reset deploy-check deploy api worker beat test web web-build check db-migrate env-check
+.PHONY: help install dev-up dev-down dev-logs dev-reset deploy-check deploy api worker beat test web web-build check db-migrate env-check epub-test
 
 COMPOSE_DEV := docker compose --env-file .env.compose -f docker-compose.dev.yml
 COMPOSE_PROD := docker compose --env-file .env.compose.production -f docker-compose.prod.yml
@@ -29,6 +29,7 @@ help:
 	@echo "  make web-build    Build frontend"
 	@echo "  make env-check    Check env safety rules"
 	@echo "  make check        Run local checks (tests + build)"
+	@echo "  make epub-test    Generate test EPUB from DB (no email)"
 	@echo ""
 	@echo "Deploy commands:"
 	@echo "  make deploy-check Run full checks before deploy"
@@ -78,6 +79,9 @@ web-build:
 
 env-check:
 	./scripts/check-env-safety.sh
+
+epub-test:
+	cd $(API_DIR) && uv run --no-sync python scripts/generate_test_epub.py
 
 check:
 	cd $(API_DIR) && uv run --no-sync pytest -v

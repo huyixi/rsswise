@@ -1,6 +1,10 @@
-const API_BASE_URL = (
+export const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL?.trim() || "/api"
 ).replace(/\/+$/, "");
+
+export function buildApiUrl(path: string) {
+  return `${API_BASE_URL}${path}`;
+}
 
 export type ReadingRecommendation = "deep_read" | "skim" | "skip";
 
@@ -84,7 +88,7 @@ async function parseResponse<T>(response: Response): Promise<T> {
 }
 
 export async function apiGet<T>(path: string): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetch(buildApiUrl(path), {
     credentials: "include",
   });
   return parseResponse<T>(response);
@@ -94,7 +98,7 @@ export async function apiPost<T = unknown>(
   path: string,
   body?: unknown,
 ): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetch(buildApiUrl(path), {
     method: "POST",
     credentials: "include",
     headers: body ? { "Content-Type": "application/json" } : undefined,
@@ -108,7 +112,7 @@ export async function apiPut<T = unknown>(
   path: string,
   body?: unknown,
 ): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetch(buildApiUrl(path), {
     method: "PUT",
     credentials: "include",
     headers: body ? { "Content-Type": "application/json" } : undefined,
@@ -119,10 +123,14 @@ export async function apiPut<T = unknown>(
 }
 
 export async function apiDelete<T = unknown>(path: string): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetch(buildApiUrl(path), {
     method: "DELETE",
     credentials: "include",
   });
 
   return parseResponse<T>(response);
+}
+
+export function openApiEventSource(path: string) {
+  return new EventSource(buildApiUrl(path), { withCredentials: true });
 }

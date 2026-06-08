@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { startTransition, useEffect, useState } from "react"
 
 import { openApiEventSource, type ArticleDetail } from "@/lib/api"
 import { queryClient } from "@/lib/query-client"
@@ -27,7 +27,7 @@ export function useArticleAnalysisEvents(article: ArticleDetail | undefined) {
 
   useEffect(() => {
     if (!article) {
-      setState({ streamText: "", isStreaming: false, streamError: null })
+      startTransition(() => setState({ streamText: "", isStreaming: false, streamError: null }))
       return
     }
 
@@ -35,7 +35,7 @@ export function useArticleAnalysisEvents(article: ArticleDetail | undefined) {
       article.analysis_status !== "pending" &&
       article.analysis_status !== "processing"
     ) {
-      setState({ streamText: "", isStreaming: false, streamError: null })
+      startTransition(() => setState({ streamText: "", isStreaming: false, streamError: null }))
       return
     }
 
@@ -44,7 +44,7 @@ export function useArticleAnalysisEvents(article: ArticleDetail | undefined) {
       `/articles/${encodeURIComponent(article.id)}/analysis/events`,
     )
 
-    setState({ streamText: "", isStreaming: true, streamError: null })
+    startTransition(() => setState({ streamText: "", isStreaming: true, streamError: null }))
 
     source.addEventListener("started", () => {
       setState((current) => ({

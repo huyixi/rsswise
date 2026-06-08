@@ -101,6 +101,43 @@ def seed_article(client: TestClient, *, user_id: str, is_read: bool = False) -> 
         return article.id
 
 
+def seed_pending_article(client: TestClient, *, user_id: str) -> UUID:
+    session_local = client.app.state.testing_session_local
+    with session_local() as db:
+        feed = Feed(
+            title="Pending Feed",
+            url="https://example.com/pending-feed.xml",
+            site_url="https://example.com",
+        )
+        article = Article(
+            feed=feed,
+            title="Pending Post",
+            url="https://example.com/pending-post",
+            author="Ada",
+            published_at=datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC),
+            summary_from_feed="Feed summary",
+            guid="pending-post-1",
+        )
+        db.add(article)
+        db.flush()
+        db.add(UserFeedSubscription(user_id=UUID(user_id), feed_id=feed.id))
+        db.add(
+            ArticleContent(
+                article_id=article.id,
+                content_markdown="# Pending Post\n\nBody text.",
+                extraction_status=ExtractionStatus.success,
+            )
+        )
+        db.add(
+            ArticleAIAnalysis(
+                article_id=article.id,
+                analysis_status=AnalysisStatus.pending,
+            )
+        )
+        db.commit()
+        return article.id
+
+
 def test_recommendation_labels_are_design_values():
     labels = {
         ReadingRecommendation.deep_read.value: "值得精读",
@@ -135,21 +172,8 @@ def test_list_articles_supports_design_read_filters(client: TestClient):
     assert client.get("/articles?status_filter=favorites").status_code == 400
 
 
-def test_detail_read_state_and_reanalysis_use_existing_markdown(
-    client: TestClient,
-    monkeypatch: pytest.MonkeyPatch,
-):
+def test_detail_read_state_and_reanalysis_route_is_removed(client: TestClient):
     user = register(client)
-    queued_ai_analysis: list[str] = []
-    queued_extraction: list[str] = []
-    monkeypatch.setattr(
-        "app.tasks.analyze_article_task.delay",
-        lambda article_id: queued_ai_analysis.append(article_id),
-    )
-    monkeypatch.setattr(
-        "app.tasks.extract_article_task.delay",
-        lambda article_id: queued_extraction.append(article_id),
-    )
     article_id = seed_article(client, user_id=user["id"], is_read=False)
 
     detail_response = client.get(f"/articles/{article_id}")
@@ -169,11 +193,7 @@ def test_detail_read_state_and_reanalysis_use_existing_markdown(
     assert unread_response.status_code == 204
     assert client.get("/articles?status_filter=unread").json()[0]["id"] == str(article_id)
 
-    reanalyze_response = client.post(f"/articles/{article_id}/reanalyze")
-    assert reanalyze_response.status_code == 202
-    assert reanalyze_response.json() == {"status": "queued"}
-    assert queued_ai_analysis == [str(article_id)]
-    assert queued_extraction == []
+    assert client.post(f"/articles/{article_id}/reanalyze").status_code == 404
 
 
 def test_articles_require_login(client: TestClient):
@@ -197,3 +217,65 @@ def test_read_state_is_isolated_per_user(client: TestClient):
 
     assert second_client.get("/articles?status_filter=read").json() == []
     assert second_client.get("/articles?status_filter=unread").json()[0]["id"] == str(article_id)
+
+
+def test_analysis_events_pending_article_enqueues_priority_task(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    user = register(client)
+    article_id = seed_pending_article(client, user_id=user["id"])
+    queued: list[tuple[list[str], int]] = []
+    redis_client = object()
+
+    monkeypatch.setattr("app.routers.articles.get_redis_client", lambda: redis_client)
+    monkeypatch.setattr(
+        "app.routers.articles.analyze_article_task.apply_async",
+        lambda args, priority: queued.append((args, priority)),
+    )
+    monkeypatch.setattr(
+        "app.routers.articles.read_analysis_events",
+        lambda client, article_id, last_event_id=None: iter(
+            [
+                ("1-0", "started", {"article_id": str(article_id)}),
+                ("2-0", "done", {"article_id": str(article_id)}),
+            ]
+        ),
+    )
+
+    response = client.get(f"/articles/{article_id}/analysis/events")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/event-stream")
+    assert "event: started" in response.text
+    assert "event: done" in response.text
+    assert queued == [([str(article_id)], 0)]
+
+
+def test_analysis_events_success_article_returns_done_without_queue(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    user = register(client)
+    article_id = seed_article(client, user_id=user["id"])
+
+    monkeypatch.setattr(
+        "app.routers.articles.analyze_article_task.apply_async",
+        lambda args, priority: pytest.fail("success article should not be queued"),
+    )
+
+    response = client.get(f"/articles/{article_id}/analysis/events")
+
+    assert response.status_code == 200
+    assert "event: done" in response.text
+    assert str(article_id) in response.text
+
+
+def test_analysis_events_require_subscription(client: TestClient):
+    first_user = register(client, "first@example.com")
+    article_id = seed_article(client, user_id=first_user["id"])
+
+    second_client = TestClient(app)
+    register(second_client, "second@example.com")
+
+    assert second_client.get(f"/articles/{article_id}/analysis/events").status_code == 404

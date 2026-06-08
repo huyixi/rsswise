@@ -1,15 +1,41 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.db.session import get_db
 from app.dependencies.auth import get_current_user
-from app.models import Article, User, UserArticleState, UserFeedSubscription
-from app.tasks import analyze_article_task
+from app.models import (
+    AnalysisStatus,
+    Article,
+    ExtractionStatus,
+    User,
+    UserArticleState,
+    UserFeedSubscription,
+)
+from app.services.analysis_events import (
+    format_sse_event,
+    get_redis_client,
+    read_analysis_events,
+)
+from app.tasks import AI_PRIORITY_USER_OPENED, analyze_article_task
 
 router = APIRouter(prefix="/articles", tags=["articles"])
+
+SSE_HEADERS = {
+    "Cache-Control": "no-cache",
+    "X-Accel-Buffering": "no",
+}
+
+
+def single_sse_response(event_type: str, payload: dict, event_id: str = "0-0"):
+    return StreamingResponse(
+        iter([format_sse_event(event_id, event_type, payload)]),
+        media_type="text/event-stream",
+        headers=SSE_HEADERS,
+    )
 
 
 def subscribed_article_statement(user: User):
@@ -127,6 +153,58 @@ def get_article(
     }
 
 
+@router.get("/{article_id}/analysis/events")
+def stream_analysis_events(
+    article_id: UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    article = get_subscribed_article_or_404(article_id, current_user, db)
+    analysis = article.ai_analysis
+
+    if article.content is None or article.content.extraction_status != ExtractionStatus.success:
+        return single_sse_response(
+            "waiting_content",
+            {"article_id": str(article_id)},
+        )
+
+    if analysis is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="article analysis not found",
+        )
+
+    if analysis.analysis_status == AnalysisStatus.success:
+        return single_sse_response("done", {"article_id": str(article_id)})
+
+    if analysis.analysis_status == AnalysisStatus.failed:
+        return single_sse_response("error", {"message": "AI 分析失败"})
+
+    if analysis.analysis_status == AnalysisStatus.pending:
+        analyze_article_task.apply_async(
+            args=[str(article_id)],
+            priority=AI_PRIORITY_USER_OPENED,
+        )
+
+    redis_client = get_redis_client()
+    last_event_id = request.headers.get("last-event-id")
+
+    def body():
+        for event_id, event_type, payload in read_analysis_events(
+            redis_client,
+            article_id,
+            last_event_id=last_event_id,
+        ):
+            yield format_sse_event(event_id, event_type, payload)
+
+    return StreamingResponse(
+        body(),
+        media_type="text/event-stream",
+        headers=SSE_HEADERS,
+    )
+
+
 @router.post("/{article_id}/read", status_code=status.HTTP_204_NO_CONTENT)
 def mark_read(
     article_id: UUID,
@@ -147,14 +225,3 @@ def mark_unread(
     get_subscribed_article_or_404(article_id, current_user, db)
     set_read_state(db, current_user, article_id, False)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-
-@router.post("/{article_id}/reanalyze", status_code=status.HTTP_202_ACCEPTED)
-def reanalyze(
-    article_id: UUID,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    get_subscribed_article_or_404(article_id, current_user, db)
-    analyze_article_task.delay(str(article_id))
-    return {"status": "queued"}

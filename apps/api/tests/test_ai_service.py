@@ -1,6 +1,6 @@
 import pytest
 
-from app.services.ai_service import parse_ai_result
+from app.services.ai_service import parse_ai_result, stream_analyze_markdown_with_deepseek
 
 
 def test_parse_ai_result_accepts_design_enum():
@@ -21,8 +21,6 @@ def test_parse_ai_result_rejects_score_output():
             '"reading_reason":"Useful."}'
         )
 
-
-from app.services.ai_service import stream_analyze_markdown_with_deepseek
 
 
 class FakeDelta:

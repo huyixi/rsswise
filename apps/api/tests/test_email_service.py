@@ -42,3 +42,56 @@ def test_validate_smtp_config_rejects_missing_host() -> None:
             smtp_host="",
             smtp_from_email="rsswise@example.com",
         )
+
+
+def test_translate_smtp_config_error_missing_host(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings, "smtp_host", "")
+    monkeypatch.setattr(settings, "smtp_from_email", "rsswise@example.com")
+
+    result = translate_smtp_config_error()
+
+    assert result == "SMTP 服务器地址未配置"
+
+
+def test_translate_smtp_config_error_missing_from_email(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "smtp_host", "smtp.example.com")
+    monkeypatch.setattr(settings, "smtp_from_email", "")
+
+    result = translate_smtp_config_error()
+
+    assert result == "发件邮箱未配置"
+
+
+def test_translate_smtp_error_authentication() -> None:
+    err = smtplib.SMTPAuthenticationError(535, b"auth failed")
+
+    result = translate_smtp_error(err)
+
+    assert "认证失败" in result
+    assert "授权码" in result
+
+
+def test_translate_smtp_error_connection_refused() -> None:
+    err = ConnectionRefusedError("connection refused")
+
+    result = translate_smtp_error(err)
+
+    assert "无法连接" in result
+
+
+def test_translate_smtp_error_timeout() -> None:
+    err = TimeoutError("connection timed out")
+
+    result = translate_smtp_error(err)
+
+    assert "超时" in result
+
+
+def test_translate_smtp_error_generic() -> None:
+    err = RuntimeError("something else went wrong")
+
+    result = translate_smtp_error(err)
+
+    assert "邮件发送失败" in result

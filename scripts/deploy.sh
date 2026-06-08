@@ -27,13 +27,8 @@ set -eu
 
 cd "$SSH_PATH"
 
-if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
-	echo "Remote tracked files have uncommitted changes. Commit or stash them before deploy." >&2
-	git status --short --untracked-files=no >&2
-	exit 1
-fi
-
-git pull --ff-only
+git fetch origin main
+git reset --hard origin/main
 
 $COMPOSE_PROD up -d --build --remove-orphans
 $COMPOSE_PROD exec -T api uv run --no-sync alembic upgrade head

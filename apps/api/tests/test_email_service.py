@@ -1,7 +1,15 @@
+import smtplib
+
 import pytest
 
 from app.core.config import settings
-from app.services.email_service import EmailAttachment, SMTPConfigError, build_email_message
+from app.services.email_service import (
+    EmailAttachment,
+    SMTPConfigError,
+    build_email_message,
+    translate_smtp_config_error,
+    translate_smtp_error,
+)
 
 
 def test_build_email_message_includes_attachment(monkeypatch: pytest.MonkeyPatch) -> None:

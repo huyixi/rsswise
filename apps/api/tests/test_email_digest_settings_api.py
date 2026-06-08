@@ -1,4 +1,5 @@
 from collections.abc import Iterator
+import smtplib
 
 import pytest
 from fastapi.testclient import TestClient
@@ -11,6 +12,7 @@ from app.db.session import get_db
 from app.main import app
 from app.models import Base, EmailDigestSetting
 from app.schemas import EmailDigestSettingsUpdate
+from app.services.email_service import SMTPConfigError
 
 
 def test_email_digest_setting_model_exists() -> None:
@@ -165,3 +167,105 @@ def test_post_email_digest_test_sends_to_saved_recipient(
     assert response.status_code == 200
     assert response.json() == {"status": "sent"}
     assert sent_messages[0]["to_email"] == "reader@example.com"
+
+
+def test_post_email_digest_test_translates_smtp_auth_error(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client.put(
+        "/settings/email-digest",
+        json={
+            "recipient_email": "reader@example.com",
+            "enabled": True,
+            "send_interval_days": 1,
+            "send_time": "08:00",
+        },
+    )
+
+    def _raise_auth_error(**kwargs: object) -> None:
+        raise smtplib.SMTPAuthenticationError(535, b"auth failed")
+
+    monkeypatch.setattr("app.routers.settings.send_email", _raise_auth_error)
+
+    response = client.post("/settings/email-digest/test")
+
+    assert response.status_code == 502
+    assert "认证失败" in response.json()["detail"]
+
+
+def test_post_email_digest_test_translates_connection_refused(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client.put(
+        "/settings/email-digest",
+        json={
+            "recipient_email": "reader@example.com",
+            "enabled": True,
+            "send_interval_days": 1,
+            "send_time": "08:00",
+        },
+    )
+
+    def _raise_connection_refused(**kwargs: object) -> None:
+        raise ConnectionRefusedError("connection refused")
+
+    monkeypatch.setattr(
+        "app.routers.settings.send_email", _raise_connection_refused
+    )
+
+    response = client.post("/settings/email-digest/test")
+
+    assert response.status_code == 502
+    assert "无法连接" in response.json()["detail"]
+
+
+def test_post_email_digest_test_translates_timeout(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client.put(
+        "/settings/email-digest",
+        json={
+            "recipient_email": "reader@example.com",
+            "enabled": True,
+            "send_interval_days": 1,
+            "send_time": "08:00",
+        },
+    )
+
+    def _raise_timeout(**kwargs: object) -> None:
+        raise TimeoutError("connection timed out")
+
+    monkeypatch.setattr("app.routers.settings.send_email", _raise_timeout)
+
+    response = client.post("/settings/email-digest/test")
+
+    assert response.status_code == 502
+    assert "超时" in response.json()["detail"]
+
+
+def test_post_email_digest_test_translates_smtp_config_error(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client.put(
+        "/settings/email-digest",
+        json={
+            "recipient_email": "reader@example.com",
+            "enabled": True,
+            "send_interval_days": 1,
+            "send_time": "08:00",
+        },
+    )
+
+    monkeypatch.setattr(
+        "app.services.email_service.settings.smtp_host", ""
+    )
+
+    def _raise_config_error(**kwargs: object) -> None:
+        raise SMTPConfigError("SMTP_HOST is required")
+
+    monkeypatch.setattr("app.routers.settings.send_email", _raise_config_error)
+
+    response = client.post("/settings/email-digest/test")
+
+    assert response.status_code == 400
+    assert "服务器地址" in response.json()["detail"]

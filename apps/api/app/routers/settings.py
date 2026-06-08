@@ -14,7 +14,12 @@ from app.services.email_digest_settings_service import (
     get_or_create_email_digest_setting,
     update_email_digest_setting,
 )
-from app.services.email_service import SMTPConfigError, send_email
+from app.services.email_service import (
+    SMTPConfigError,
+    send_email,
+    translate_smtp_config_error,
+    translate_smtp_error,
+)
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -63,12 +68,15 @@ def send_test_email(db: Session = Depends(get_db)) -> EmailDigestTestResponse:
             to_email=setting.recipient_email,
             text_body="这是一封 RSSWise 测试邮件，用于验证 SMTP 和收件邮箱配置。",
         )
-    except SMTPConfigError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except SMTPConfigError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=translate_smtp_config_error(),
+        )
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="failed to send test email",
+            detail=translate_smtp_error(exc),
         ) from exc
 
     return EmailDigestTestResponse()

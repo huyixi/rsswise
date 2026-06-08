@@ -9,6 +9,27 @@ class SMTPConfigError(ValueError):
     pass
 
 
+def translate_smtp_config_error() -> str:
+    if not settings.smtp_host:
+        return "SMTP 服务器地址未配置"
+    if not settings.smtp_from_email:
+        return "发件邮箱未配置"
+    return "SMTP 配置不完整"
+
+
+def translate_smtp_error(exc: Exception) -> str:
+    if isinstance(exc, smtplib.SMTPAuthenticationError):
+        return "邮箱认证失败，请检查 SMTP 授权码或密码"
+    if isinstance(exc, ConnectionRefusedError):
+        return "无法连接邮件服务器，请检查 SMTP 地址和端口"
+    if isinstance(exc, TimeoutError):
+        return "连接邮件服务器超时，请检查网络"
+    msg = str(exc)
+    if isinstance(exc, OSError) and "timeout" in msg.lower():
+        return "连接邮件服务器超时，请检查网络"
+    return "邮件发送失败"
+
+
 @dataclass(frozen=True)
 class EmailAttachment:
     filename: str

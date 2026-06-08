@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test"
 
 const firstArticleId = "11111111-1111-1111-1111-111111111111"
 const secondArticleId = "22222222-2222-2222-2222-222222222222"
+const streamingArticleId = "33333333-3333-3333-3333-333333333333"
 
 const articleList = [
   {
@@ -20,6 +21,15 @@ const articleList = [
     published_at: "2026-06-05T08:00:00Z",
     one_sentence_summary: "这是第二篇文章的一句话摘要",
     reading_recommendation: "skim",
+    is_read: false,
+  },
+  {
+    id: streamingArticleId,
+    title: "流式 AI 摘要测试",
+    source_title: "RSSWise 测试源",
+    published_at: "2026-06-06T08:00:00Z",
+    one_sentence_summary: null,
+    reading_recommendation: null,
     is_read: false,
   },
 ]
@@ -52,12 +62,27 @@ const secondArticleDetail = {
   analysis_status: "success",
 }
 
+const streamingArticleDetail = {
+  id: streamingArticleId,
+  title: "流式 AI 摘要测试",
+  source_title: "RSSWise 测试源",
+  published_at: "2026-06-06T08:00:00Z",
+  url: "https://example.com/streaming-ai-article",
+  one_sentence_summary: null,
+  reading_recommendation: null,
+  reading_reason: null,
+  content_markdown: "## 流式正文\n\n这是流式测试正文。",
+  extraction_status: "success",
+  analysis_status: "processing",
+}
+
 const articleDetails: Record<
   string,
-  typeof articleDetail | typeof secondArticleDetail
+  typeof articleDetail | typeof secondArticleDetail | typeof streamingArticleDetail
 > = {
   [firstArticleId]: articleDetail,
   [secondArticleId]: secondArticleDetail,
+  [streamingArticleId]: streamingArticleDetail,
 }
 
 async function mockAuthenticatedUser(page: Page) {
@@ -99,6 +124,28 @@ async function mockReadRoute(page: Page, onRead?: (articleId: string) => void) {
     onRead?.(articleId)
     await route.fulfill({ status: 204, body: "" })
   })
+}
+
+async function mockAnalysisStreamRoute(page: Page) {
+  await page.route(
+    `**/api/articles/${streamingArticleId}/analysis/events`,
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        headers: {
+          "content-type": "text/event-stream",
+          "cache-control": "no-cache",
+        },
+        body:
+          `id: 1-0\n` +
+          `event: started\n` +
+          `data: {"article_id":"${streamingArticleId}"}\n\n` +
+          `id: 2-0\n` +
+          `event: chunk\n` +
+          `data: {"text":"流式摘要正在生成"}\n\n`,
+      })
+    },
+  )
 }
 
 test("article list has required filters", async ({ page }) => {
@@ -239,4 +286,34 @@ test("desktop workbench list click keeps query-param detail behavior", async ({
     /\/articles\?id=11111111-1111-1111-1111-111111111111$/,
   )
   await expect(page.getByRole("heading", { name: "移动端文章详情测试" })).toBeVisible()
+})
+
+test("desktop workbench shows streaming AI summary text", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await mockAuthenticatedUser(page)
+  await mockArticleRoutes(page)
+  await mockReadRoute(page)
+  await mockAnalysisStreamRoute(page)
+
+  await page.goto(`/articles?id=${streamingArticleId}`)
+
+  await expect(page.getByRole("heading", { name: "流式 AI 摘要测试" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "AI 总结" })).toBeVisible()
+  await expect(page.getByText("流式摘要正在生成")).toBeVisible()
+  await expect(page.getByText("重新 AI 分析")).toHaveCount(0)
+})
+
+test("mobile detail shows streaming AI summary text", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await mockAuthenticatedUser(page)
+  await mockArticleRoutes(page)
+  await mockReadRoute(page)
+  await mockAnalysisStreamRoute(page)
+
+  await page.goto(`/articles/${streamingArticleId}`)
+
+  await expect(page.getByRole("heading", { name: "流式 AI 摘要测试" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "AI 总结" })).toBeVisible()
+  await expect(page.getByText("流式摘要正在生成")).toBeVisible()
+  await expect(page.getByText("重新 AI 分析")).toHaveCount(0)
 })

@@ -3,6 +3,7 @@ import { ExternalLinkIcon, SparklesIcon } from "lucide-react"
 import { MarkdownContent } from "@/components/markdown-content"
 import { RecommendationBadge } from "@/components/recommendation-badge"
 import type { ArticleDetail } from "@/lib/api"
+import { useArticleAnalysisEvents } from "./use-article-analysis-events"
 import { cn } from "@/lib/utils"
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -60,10 +61,14 @@ export function ArticleAiSummary({
   article: ArticleDetail
   className?: string
 }) {
+  const { streamText, isStreaming, streamError } = useArticleAnalysisEvents(article)
+
   const hasAiContent =
     article.reading_recommendation ||
     article.one_sentence_summary ||
-    article.reading_reason
+    article.reading_reason ||
+    streamText ||
+    streamError
 
   return (
     <section
@@ -95,9 +100,23 @@ export function ArticleAiSummary({
               {article.reading_reason}
             </p>
           ) : null}
+
+          {!article.one_sentence_summary && streamText ? (
+            <p className="whitespace-pre-wrap break-words text-sm leading-6 text-foreground">
+              {streamText}
+            </p>
+          ) : null}
+
+          {streamError ? (
+            <p className="text-sm leading-6 text-destructive-foreground">
+              {streamError}
+            </p>
+          ) : null}
         </div>
       ) : (
-        <p className="text-sm text-muted-foreground">AI 总结处理中</p>
+        <p className="text-sm text-muted-foreground">
+          {isStreaming ? "AI 总结生成中" : "AI 总结处理中"}
+        </p>
       )}
     </section>
   )

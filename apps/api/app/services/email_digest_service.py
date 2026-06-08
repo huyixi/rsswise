@@ -98,9 +98,9 @@ def run_due_email_digest(db: Session, *, now: datetime | None = None) -> str:
     try:
         epub = build_digest_epub(articles, digest_date=digest_date)
         send_email(
-            subject=f"RSSWise 摘要 - {digest_date}",
+            subject=f"RSSWise 文章推送 - {digest_date}",
             to_email=setting.recipient_email,
-            text_body=f"本次 RSSWise 摘要包含 {len(articles)} 篇文章，见附件 EPUB。",
+            text_body=f"本次推送包含 {len(articles)} 篇文章，见附件 EPUB。",
             attachments=[
                 EmailAttachment(
                     filename=f"rsswise-digest-{digest_date}.epub",

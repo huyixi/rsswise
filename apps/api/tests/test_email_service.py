@@ -17,9 +17,9 @@ def test_build_email_message_includes_attachment(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(settings, "smtp_from_email", "rsswise@example.com")
 
     message = build_email_message(
-        subject="RSSWise 摘要 - 2026-06-04",
+        subject="RSSWise 文章推送 - 2026-06-04",
         to_email="reader@example.com",
-        text_body="本次摘要包含 1 篇文章。",
+        text_body="本次推送包含 1 篇文章。",
         attachments=[
             EmailAttachment(
                 filename="rsswise-digest-2026-06-04.epub",
@@ -29,7 +29,7 @@ def test_build_email_message_includes_attachment(monkeypatch: pytest.MonkeyPatch
         ],
     )
 
-    assert message["Subject"] == "RSSWise 摘要 - 2026-06-04"
+    assert message["Subject"] == "RSSWise 文章推送 - 2026-06-04"
     assert message["To"] == "reader@example.com"
     assert message.is_multipart()
 

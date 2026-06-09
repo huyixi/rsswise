@@ -43,7 +43,23 @@ const articleDetail = {
   one_sentence_summary: null,
   reading_recommendation: "deep_read",
   reading_reason: null,
-  content_markdown: "## 正文标题\n\n这是正文内容。",
+  content_markdown: [
+    "## 正文标题",
+    "",
+    "这是正文内容。",
+    "",
+    "这是一个很长的链接：https://example.com/articles/this-is-a-very-long-url-that-should-wrap-inside-the-reader-without-forcing-horizontal-page-overflow",
+    "",
+    "```ts",
+    "const veryLongIdentifier = \"this-code-block-is-intentionally-long-and-should-scroll-inside-the-code-block-instead-of-widening-the-page\"",
+    "```",
+    "",
+    "| 指标 | 说明 |",
+    "| --- | --- |",
+    "| 很长的表格内容 | 这个单元格故意包含很长很长的文本以验证表格不会撑爆移动端布局 |",
+    "",
+    "![测试图片](https://example.com/image.png)",
+  ].join("\n"),
   extraction_status: "success",
   analysis_status: "success",
   ai_blocks: [
@@ -229,6 +245,10 @@ test("mobile article list opens standalone detail page", async ({ page }) => {
   await expect(page.getByText("来自 block 的一句话摘要")).toBeVisible()
   await expect(page.getByText("来自 block 的阅读理由。")).toBeVisible()
   await expect(page.getByText("这是正文内容。")).toBeVisible()
+  await expect(page.getByRole("heading", { name: "带读问题" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "摘录" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "一句话摘要" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "阅读理由" })).toBeVisible()
   expect(readRequestCount).toBe(1)
 })
 
@@ -250,6 +270,28 @@ test("mobile detail shows AI summary before article body", async ({ page }) => {
     node.getBoundingClientRect().top,
   )
   expect(aiBoxTop).toBeLessThan(bodyTop)
+})
+
+test("mobile article body strips duplicate leading heading and avoids viewport overflow", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await mockAuthenticatedUser(page)
+  await mockArticleRoutes(page)
+  await mockReadRoute(page)
+
+  await page.goto("/articles/11111111-1111-1111-1111-111111111111")
+
+  await expect(page.getByText("这是正文内容。")).toBeVisible()
+  await expect(page.getByRole("heading", { name: "正文标题" })).toHaveCount(0)
+  await expect(page.locator("pre")).toBeVisible()
+  await expect(page.locator("table")).toBeVisible()
+  await expect(page.locator("img[alt='测试图片']")).toBeVisible()
+
+  const hasPageOverflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > window.innerWidth + 1,
+  )
+  expect(hasPageOverflow).toBe(false)
 })
 
 test("mobile detail renders blocks in order", async ({ page }) => {
@@ -365,6 +407,7 @@ test("desktop workbench shows streaming AI summary text", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "流式 AI 摘要测试" })).toBeVisible()
   await expect(page.getByRole("heading", { name: "AI 总结" })).toBeVisible()
   await expect(page.getByText("这篇文章正在生成什么问题？")).toBeVisible()
+  await expect(page.getByRole("heading", { name: "带读问题" })).toBeVisible()
   await expect(page.getByText("重新 AI 分析")).toHaveCount(0)
 })
 
@@ -380,5 +423,6 @@ test("mobile detail shows streaming AI summary text", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "流式 AI 摘要测试" })).toBeVisible()
   await expect(page.getByRole("heading", { name: "AI 总结" })).toBeVisible()
   await expect(page.getByText("这篇文章正在生成什么问题？")).toBeVisible()
+  await expect(page.getByRole("heading", { name: "带读问题" })).toBeVisible()
   await expect(page.getByText("重新 AI 分析")).toHaveCount(0)
 })

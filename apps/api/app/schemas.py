@@ -1,10 +1,64 @@
 from datetime import date, datetime
 import re
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator, model_validator
 
 from app.models import AnalysisStatus, ExtractionStatus, ReadingRecommendation
+
+
+class HighlightBlockItem(BaseModel):
+    text: str
+    quote_verified: bool
+
+
+class ChapterBlockItem(BaseModel):
+    title: str
+
+
+class ReadingQuestionBlock(BaseModel):
+    type: Literal["reading_question"]
+    title: Literal["带读问题"]
+    content: str
+    order: int
+
+
+class HighlightsBlock(BaseModel):
+    type: Literal["highlights"]
+    title: Literal["Highlights"]
+    content: list[HighlightBlockItem]
+    order: int
+
+
+class SummaryBlock(BaseModel):
+    type: Literal["summary"]
+    title: Literal["一句话摘要"]
+    content: str
+    order: int
+
+
+class ReadingReasonBlock(BaseModel):
+    type: Literal["reading_reason"]
+    title: Literal["阅读理由"]
+    content: str
+    order: int
+
+
+class ChaptersBlock(BaseModel):
+    type: Literal["chapters"]
+    title: Literal["章节"]
+    content: list[ChapterBlockItem]
+    order: int
+
+
+AiBlock = (
+    ReadingQuestionBlock
+    | HighlightsBlock
+    | SummaryBlock
+    | ReadingReasonBlock
+    | ChaptersBlock
+)
 
 
 class FeedCreate(BaseModel):
@@ -65,6 +119,7 @@ class ArticleDetail(BaseModel):
     content_markdown: str | None
     extraction_status: ExtractionStatus | None
     analysis_status: AnalysisStatus | None
+    ai_blocks: list[AiBlock] | None
 
 
 class QueuedResponse(BaseModel):

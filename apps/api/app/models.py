@@ -9,6 +9,7 @@ from sqlalchemy import (
     Enum,
     ForeignKey,
     Integer,
+    JSON,
     String,
     Text,
     Time,
@@ -130,6 +131,7 @@ class ArticleAIAnalysis(Base):
         nullable=True,
     )
     reading_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ai_blocks: Mapped[list[dict] | None] = mapped_column(JSON, nullable=True)
     analysis_status: Mapped[AnalysisStatus] = mapped_column(
         Enum(AnalysisStatus, name="analysis_status"),
         default=AnalysisStatus.pending,

@@ -158,7 +158,7 @@ export function ArticleAiSummary({
           ) : null}
 
           {!hasBlocks && streamText ? (
-            <MarkdownContent markdown={streamText} />
+            <MarkdownContent markdown={streamText} variant="compact" />
           ) : null}
 
           {streamError ? (
@@ -185,7 +185,11 @@ export function ArticleBody({
 }) {
   return (
     <div className={cn("border-t pt-6", className)}>
-      <MarkdownContent markdown={contentMarkdown ?? "正文处理中……"} />
+      <MarkdownContent
+        markdown={contentMarkdown ?? "正文处理中……"}
+        variant="article"
+        stripLeadingHeading
+      />
     </div>
   )
 }

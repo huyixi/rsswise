@@ -27,10 +27,14 @@ def build_ai_messages(markdown: str) -> list[dict[str, str]]:
         {
             "role": "system",
             "content": (
-                "你是 RSS 阅读前分析助手。只返回 JSON。"
-                "字段必须是 one_sentence_summary, reading_recommendation, reading_reason。"
-                "reading_recommendation 只能是 deep_read, skim, skip。"
-                "不要输出长摘要、分数、target readers 或 keywords。"
+                "你是 RSS 阅读前分析助手。请只输出 Markdown，不要输出 JSON。"
+                "必须按顺序输出以下二级标题：## 带读问题、## Highlights、## 一句话摘要、## 阅读建议、## 阅读理由、## 章节。"
+                "带读问题必须是一句中文问题。"
+                "Highlights 必须是 3-5 条项目符号，每条都必须逐字摘录原文，不要翻译、改写或编造。"
+                "一句话摘要必须是一句中文。"
+                "阅读建议只能输出 deep_read、skim 或 skip。"
+                "阅读理由必须用中文说明为什么适合读、略读或跳过。"
+                "章节只在文章确实有明显结构时输出项目符号标题；短讯、公告或结构单一文章可留空。"
             ),
         },
         {"role": "user", "content": markdown[:40000]},
@@ -60,7 +64,6 @@ def stream_analyze_markdown_with_deepseek(markdown: str) -> Iterator[str]:
     client = create_deepseek_client()
     response = client.chat.completions.create(
         model=settings.deepseek_model,
-        response_format={"type": "json_object"},
         messages=build_ai_messages(markdown),
         stream=True,
     )

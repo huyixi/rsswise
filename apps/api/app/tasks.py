@@ -17,7 +17,8 @@ from app.models import (
 )
 from redis.exceptions import RedisError
 
-from app.services.ai_service import parse_ai_result, stream_analyze_markdown_with_deepseek
+from app.services.ai_blocks import parse_ai_markdown
+from app.services.ai_service import stream_analyze_markdown_with_deepseek
 from app.services.analysis_events import (
     get_redis_client,
     reset_analysis_events,
@@ -118,10 +119,9 @@ def analyze_article_task(article_id: str) -> None:
                     {"text": chunk},
                 )
 
-            result = parse_ai_result("".join(raw_chunks))
-            analysis.one_sentence_summary = result.one_sentence_summary
-            analysis.reading_recommendation = ReadingRecommendation(result.reading_recommendation)
-            analysis.reading_reason = result.reading_reason
+            parsed = parse_ai_markdown("".join(raw_chunks), source_markdown=content.content_markdown)
+            analysis.ai_blocks = parsed.ai_blocks
+            analysis.reading_recommendation = ReadingRecommendation(parsed.reading_recommendation)
             analysis.analysis_status = AnalysisStatus.success
             analysis.updated_at = datetime.now(UTC).replace(tzinfo=None)
             db.commit()

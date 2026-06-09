@@ -124,6 +124,15 @@ def test_extract_article_queues_background_ai_priority(
     assert queued == [([str(article_id)], AI_PRIORITY_BACKGROUND)]
 
 
+VALID_MARKDOWN_CHUNKS = [
+    "## 带读问题\n这篇文章要回答什么？\n\n",
+    "## Highlights\n- 原文第一句。\n- 原文第二句。\n- 原文第三句。\n\n",
+    "## 一句话摘要\n这是一句话摘要。\n\n",
+    "## 阅读建议\nskim\n\n",
+    "## 阅读理由\n这篇文章适合快速了解背景。\n",
+]
+
+
 def test_analyze_article_streams_chunks_and_persists_final_result(
     session_local: sessionmaker[Session],
     monkeypatch: pytest.MonkeyPatch,
@@ -146,13 +155,7 @@ def test_analyze_article_streams_chunks_and_persists_final_result(
     )
     monkeypatch.setattr(
         "app.tasks.stream_analyze_markdown_with_deepseek",
-        lambda markdown: iter(
-            [
-                '{"one_sentence_summary":"Short summary.",',
-                '"reading_recommendation":"skim",',
-                '"reading_reason":"Useful context."}',
-            ]
-        ),
+        lambda markdown: iter(VALID_MARKDOWN_CHUNKS),
     )
 
     analyze_article_task(str(article_id))
@@ -160,21 +163,11 @@ def test_analyze_article_streams_chunks_and_persists_final_result(
     assert writes == [
         ("reset", str(article_id), None),
         ("started", str(article_id), {"article_id": str(article_id)}),
-        (
-            "chunk",
-            str(article_id),
-            {"text": '{"one_sentence_summary":"Short summary.",'},
-        ),
-        (
-            "chunk",
-            str(article_id),
-            {"text": '"reading_recommendation":"skim",'},
-        ),
-        (
-            "chunk",
-            str(article_id),
-            {"text": '"reading_reason":"Useful context."}'},
-        ),
+        ("chunk", str(article_id), {"text": "## 带读问题\n这篇文章要回答什么？\n\n"}),
+        ("chunk", str(article_id), {"text": "## Highlights\n- 原文第一句。\n- 原文第二句。\n- 原文第三句。\n\n"}),
+        ("chunk", str(article_id), {"text": "## 一句话摘要\n这是一句话摘要。\n\n"}),
+        ("chunk", str(article_id), {"text": "## 阅读建议\nskim\n\n"}),
+        ("chunk", str(article_id), {"text": "## 阅读理由\n这篇文章适合快速了解背景。\n"}),
         ("done", str(article_id), {"article_id": str(article_id)}),
     ]
 
@@ -182,9 +175,41 @@ def test_analyze_article_streams_chunks_and_persists_final_result(
         analysis = db.get(ArticleAIAnalysis, article_id)
         assert analysis is not None
         assert analysis.analysis_status == AnalysisStatus.success
-        assert analysis.one_sentence_summary == "Short summary."
+        assert analysis.ai_blocks is not None
+        assert [block["type"] for block in analysis.ai_blocks] == [
+            "reading_question",
+            "highlights",
+            "summary",
+            "reading_reason",
+        ]
         assert analysis.reading_recommendation == ReadingRecommendation.skim
-        assert analysis.reading_reason == "Useful context."
+        assert analysis.one_sentence_summary is None
+        assert analysis.reading_reason is None
+
+
+def test_analyze_article_marks_failed_when_ai_markdown_is_invalid(
+    session_local: sessionmaker[Session],
+    monkeypatch: pytest.MonkeyPatch,
+):
+    with session_local() as db:
+        article_id = seed_article(db)
+
+    monkeypatch.setattr("app.tasks.get_redis_client", lambda: object())
+    monkeypatch.setattr("app.tasks.reset_analysis_events", lambda client, article_id: None)
+    monkeypatch.setattr("app.tasks.write_analysis_event", lambda client, article_id, event_type, payload: None)
+    monkeypatch.setattr(
+        "app.tasks.stream_analyze_markdown_with_deepseek",
+        lambda markdown: iter(["## 带读问题\n缺少其它字段"]),
+    )
+
+    with pytest.raises(Exception):
+        analyze_article_task(str(article_id))
+
+    with session_local() as db:
+        analysis = db.get(ArticleAIAnalysis, article_id)
+        assert analysis is not None
+        assert analysis.analysis_status == AnalysisStatus.failed
+        assert analysis.ai_blocks is None
 
 
 def test_analyze_article_skips_already_processing_article(
@@ -229,13 +254,7 @@ def test_analyze_article_persists_result_when_redis_events_fail(
     )
     monkeypatch.setattr(
         "app.tasks.stream_analyze_markdown_with_deepseek",
-        lambda markdown: iter(
-            [
-                '{"one_sentence_summary":"Short summary.",',
-                '"reading_recommendation":"skim",',
-                '"reading_reason":"Useful context."}',
-            ]
-        ),
+        lambda markdown: iter(VALID_MARKDOWN_CHUNKS),
     )
 
     analyze_article_task(str(article_id))
@@ -244,4 +263,4 @@ def test_analyze_article_persists_result_when_redis_events_fail(
         analysis = db.get(ArticleAIAnalysis, article_id)
         assert analysis is not None
         assert analysis.analysis_status == AnalysisStatus.success
-        assert analysis.one_sentence_summary == "Short summary."
+        assert analysis.ai_blocks is not None

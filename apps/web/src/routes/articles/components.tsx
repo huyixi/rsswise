@@ -2,7 +2,7 @@ import { ExternalLinkIcon, SparklesIcon } from "lucide-react"
 
 import { MarkdownContent } from "@/components/markdown-content"
 import { RecommendationBadge } from "@/components/recommendation-badge"
-import type { ArticleDetail } from "@/lib/api"
+import type { AiBlock, ArticleDetail } from "@/lib/api"
 import { useArticleAnalysisEvents } from "./use-article-analysis-events"
 import { cn } from "@/lib/utils"
 
@@ -13,6 +13,12 @@ export function formatArticleDate(value: string | null) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value))
+}
+
+function visibleAiBlocks(blocks: AiBlock[] | null) {
+  return [...(blocks ?? [])]
+    .sort((a, b) => a.order - b.order)
+    .filter((block) => block.type !== "chapters" || block.content.length > 0)
 }
 
 export function ArticleHeader({
@@ -63,12 +69,14 @@ export function ArticleAiSummary({
 }) {
   const { streamText, isStreaming, streamError } = useArticleAnalysisEvents(article)
 
-  const hasAiContent =
+  const blocks = visibleAiBlocks(article.ai_blocks)
+
+  const hasBlocks = blocks.length > 0
+  const hasLegacyContent =
     article.reading_recommendation ||
     article.one_sentence_summary ||
-    article.reading_reason ||
-    streamText ||
-    streamError
+    article.reading_reason
+  const hasAiContent = hasBlocks || hasLegacyContent || streamText || streamError
 
   return (
     <section
@@ -89,22 +97,68 @@ export function ArticleAiSummary({
 
       {hasAiContent ? (
         <div className="flex flex-col gap-3">
-          {article.one_sentence_summary ? (
-            <p className="text-sm leading-6 text-foreground">
-              {article.one_sentence_summary}
-            </p>
+          {hasBlocks ? (
+            blocks.map((block) => (
+              <div key={block.type}>
+                {block.type === "reading_question" ? (
+                  <p className="text-sm font-medium text-foreground">
+                    {block.content}
+                  </p>
+                ) : null}
+                {block.type === "highlights" ? (
+                  <ul className="flex list-none flex-col gap-1.5 pl-0">
+                    {block.content.map((item, idx) => (
+                      <li
+                        key={idx}
+                        className="border-l-2 border-muted-foreground/30 pl-3 text-sm italic text-muted-foreground"
+                      >
+                        {item.text}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+                {block.type === "summary" ? (
+                  <p className="text-sm leading-6 text-foreground">
+                    {block.content}
+                  </p>
+                ) : null}
+                {block.type === "reading_reason" ? (
+                  <p className="text-sm leading-6 text-muted-foreground">
+                    {block.content}
+                  </p>
+                ) : null}
+                {block.type === "chapters" ? (
+                  <ul className="flex list-none flex-wrap gap-1.5 pl-0">
+                    {block.content.map((item, idx) => (
+                      <li
+                        key={idx}
+                        className="rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+                      >
+                        {item.title}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+            ))
+          ) : hasLegacyContent ? (
+            <>
+              {article.one_sentence_summary ? (
+                <p className="text-sm leading-6 text-foreground">
+                  {article.one_sentence_summary}
+                </p>
+              ) : null}
+
+              {article.reading_reason ? (
+                <p className="text-sm leading-6 text-muted-foreground">
+                  {article.reading_reason}
+                </p>
+              ) : null}
+            </>
           ) : null}
 
-          {article.reading_reason ? (
-            <p className="text-sm leading-6 text-muted-foreground">
-              {article.reading_reason}
-            </p>
-          ) : null}
-
-          {!article.one_sentence_summary && streamText ? (
-            <p className="whitespace-pre-wrap break-words text-sm leading-6 text-foreground">
-              {streamText}
-            </p>
+          {!hasBlocks && streamText ? (
+            <MarkdownContent markdown={streamText} />
           ) : null}
 
           {streamError ? (

@@ -40,12 +40,48 @@ const articleDetail = {
   source_title: "RSSWise 测试源",
   published_at: "2026-06-04T08:00:00Z",
   url: "https://example.com/mobile-article",
-  one_sentence_summary: "这是一句话 AI 摘要",
+  one_sentence_summary: null,
   reading_recommendation: "deep_read",
-  reading_reason: "这篇文章和当前关注主题高度相关。",
+  reading_reason: null,
   content_markdown: "## 正文标题\n\n这是正文内容。",
   extraction_status: "success",
   analysis_status: "success",
+  ai_blocks: [
+    {
+      type: "summary" as const,
+      title: "一句话摘要" as const,
+      content: "来自 block 的一句话摘要",
+      order: 30,
+    },
+    {
+      type: "reading_question" as const,
+      title: "带读问题" as const,
+      content: "这篇文章要回答什么问题？",
+      order: 10,
+    },
+    {
+      type: "highlights" as const,
+      title: "Highlights" as const,
+      content: [
+        { text: "原文第一句亮点。", quote_verified: false },
+        { text: "原文第二句亮点。", quote_verified: false },
+        { text: "原文第三句亮点。", quote_verified: false },
+      ],
+      order: 20,
+    },
+    {
+      type: "reading_reason" as const,
+      title: "阅读理由" as const,
+      content: "来自 block 的阅读理由。",
+      order: 40,
+    },
+    {
+      type: "chapters" as const,
+      title: "章节" as const,
+      content: [] as Array<{ title: string }>,
+      order: 50,
+    },
+  ],
 }
 
 const secondArticleDetail = {
@@ -60,6 +96,7 @@ const secondArticleDetail = {
   content_markdown: "## 第二篇正文\n\n这是第二篇正文内容。",
   extraction_status: "success",
   analysis_status: "success",
+  ai_blocks: null,
 }
 
 const streamingArticleDetail = {
@@ -74,6 +111,7 @@ const streamingArticleDetail = {
   content_markdown: "## 流式正文\n\n这是流式测试正文。",
   extraction_status: "success",
   analysis_status: "processing",
+  ai_blocks: null,
 }
 
 const articleDetails: Record<
@@ -142,7 +180,7 @@ async function mockAnalysisStreamRoute(page: Page) {
           `data: {"article_id":"${streamingArticleId}"}\n\n` +
           `id: 2-0\n` +
           `event: chunk\n` +
-          `data: {"text":"流式摘要正在生成"}\n\n`,
+          `data: {"text":"## 带读问题\\n这篇文章正在生成什么问题？\\n\\n"}\n\n`,
       })
     },
   )
@@ -186,8 +224,10 @@ test("mobile article list opens standalone detail page", async ({ page }) => {
 
   await expect(page.getByRole("heading", { name: "移动端文章详情测试" })).toBeVisible()
   await expect(page.getByRole("heading", { name: "AI 总结" })).toBeVisible()
-  await expect(page.getByText("这是一句话 AI 摘要")).toBeVisible()
-  await expect(page.getByText("这篇文章和当前关注主题高度相关。")).toBeVisible()
+  await expect(page.getByText("这篇文章要回答什么问题？")).toBeVisible()
+  await expect(page.getByText("原文第一句亮点。")).toBeVisible()
+  await expect(page.getByText("来自 block 的一句话摘要")).toBeVisible()
+  await expect(page.getByText("来自 block 的阅读理由。")).toBeVisible()
   await expect(page.getByText("这是正文内容。")).toBeVisible()
   expect(readRequestCount).toBe(1)
 })
@@ -210,6 +250,31 @@ test("mobile detail shows AI summary before article body", async ({ page }) => {
     node.getBoundingClientRect().top,
   )
   expect(aiBoxTop).toBeLessThan(bodyTop)
+})
+
+test("mobile detail renders blocks in order", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await mockAuthenticatedUser(page)
+  await mockArticleRoutes(page)
+  await mockReadRoute(page)
+
+  await page.goto("/articles/11111111-1111-1111-1111-111111111111")
+
+  const questionTop = await page.getByText("这篇文章要回答什么问题？").evaluate(
+    (node) => node.getBoundingClientRect().top,
+  )
+  const highlightTop = await page.getByText("原文第一句亮点。").evaluate(
+    (node) => node.getBoundingClientRect().top,
+  )
+  const summaryTop = await page.getByText("来自 block 的一句话摘要").evaluate(
+    (node) => node.getBoundingClientRect().top,
+  )
+  const reasonTop = await page.getByText("来自 block 的阅读理由。").evaluate(
+    (node) => node.getBoundingClientRect().top,
+  )
+  expect(questionTop).toBeLessThan(highlightTop)
+  expect(highlightTop).toBeLessThan(summaryTop)
+  expect(summaryTop).toBeLessThan(reasonTop)
 })
 
 test("desktop article detail route redirects to workbench selection", async ({ page }) => {
@@ -299,7 +364,7 @@ test("desktop workbench shows streaming AI summary text", async ({ page }) => {
 
   await expect(page.getByRole("heading", { name: "流式 AI 摘要测试" })).toBeVisible()
   await expect(page.getByRole("heading", { name: "AI 总结" })).toBeVisible()
-  await expect(page.getByText("流式摘要正在生成")).toBeVisible()
+  await expect(page.getByText("这篇文章正在生成什么问题？")).toBeVisible()
   await expect(page.getByText("重新 AI 分析")).toHaveCount(0)
 })
 
@@ -314,6 +379,6 @@ test("mobile detail shows streaming AI summary text", async ({ page }) => {
 
   await expect(page.getByRole("heading", { name: "流式 AI 摘要测试" })).toBeVisible()
   await expect(page.getByRole("heading", { name: "AI 总结" })).toBeVisible()
-  await expect(page.getByText("流式摘要正在生成")).toBeVisible()
+  await expect(page.getByText("这篇文章正在生成什么问题？")).toBeVisible()
   await expect(page.getByText("重新 AI 分析")).toHaveCount(0)
 })

@@ -8,6 +8,43 @@ export function buildApiUrl(path: string) {
 
 export type ReadingRecommendation = "deep_read" | "skim" | "skip";
 
+export type AiBlock =
+  | {
+      type: "reading_question"
+      title: "带读问题"
+      content: string
+      order: number
+    }
+  | {
+      type: "highlights"
+      title: "Highlights"
+      content: Array<{
+        text: string
+        quote_verified: boolean
+      }>
+      order: number
+    }
+  | {
+      type: "summary"
+      title: "一句话摘要"
+      content: string
+      order: number
+    }
+  | {
+      type: "reading_reason"
+      title: "阅读理由"
+      content: string
+      order: number
+    }
+  | {
+      type: "chapters"
+      title: "章节"
+      content: Array<{
+        title: string
+      }>
+      order: number
+    }
+
 export type ArticleListItem = {
   id: string;
   title: string;
@@ -30,6 +67,7 @@ export type ArticleDetail = {
   content_markdown: string | null;
   extraction_status: "pending" | "processing" | "success" | "failed" | null;
   analysis_status: "pending" | "processing" | "success" | "failed" | null;
+  ai_blocks: AiBlock[] | null;
 };
 
 export type Feed = {

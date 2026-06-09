@@ -21,6 +21,21 @@ function visibleAiBlocks(blocks: AiBlock[] | null) {
     .filter((block) => block.type !== "chapters" || block.content.length > 0)
 }
 
+function aiBlockLabel(block: AiBlock) {
+  switch (block.type) {
+    case "reading_question":
+      return "带读问题"
+    case "highlights":
+      return "摘录"
+    case "summary":
+      return "一句话摘要"
+    case "reading_reason":
+      return "阅读理由"
+    case "chapters":
+      return "章节"
+  }
+}
+
 export function ArticleHeader({
   article,
   className,
@@ -99,7 +114,10 @@ export function ArticleAiSummary({
         <div className="flex flex-col gap-3">
           {hasBlocks ? (
             blocks.map((block) => (
-              <div key={block.type}>
+              <section key={block.type} className="flex flex-col gap-1.5">
+                <h3 className="text-xs font-medium text-muted-foreground">
+                  {aiBlockLabel(block)}
+                </h3>
                 {block.type === "reading_question" ? (
                   <p className="text-sm font-medium text-foreground">
                     {block.content}
@@ -139,7 +157,7 @@ export function ArticleAiSummary({
                     ))}
                   </ul>
                 ) : null}
-              </div>
+              </section>
             ))
           ) : hasLegacyContent ? (
             <>

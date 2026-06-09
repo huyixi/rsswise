@@ -18,8 +18,22 @@ def make_article(*, content_markdown: str | None) -> Article:
     )
     article.content = ArticleContent(content_markdown=content_markdown)
     article.ai_analysis = ArticleAIAnalysis(
-        one_sentence_summary="一句话摘要",
-        reading_reason="值得阅读的理由",
+        ai_blocks=[
+            {
+                "type": "summary",
+                "title": "一句话摘要",
+                "content": "来自 block 的 EPUB 摘要",
+                "order": 30,
+            },
+            {
+                "type": "reading_reason",
+                "title": "阅读理由",
+                "content": "来自 block 的 EPUB 理由",
+                "order": 40,
+            },
+        ],
+        one_sentence_summary="旧摘要",
+        reading_reason="旧理由",
     )
     return article
 
@@ -40,8 +54,10 @@ def test_build_digest_epub_contains_article_metadata_and_body() -> None:
     assert "A useful article" in chapter
     assert "Example Feed" in chapter
     assert "https://example.com/a-useful-article" in chapter
-    assert "一句话摘要" in chapter
-    assert "值得阅读的理由" in chapter
+    assert "来自 block 的 EPUB 摘要" in chapter
+    assert "来自 block 的 EPUB 理由" in chapter
+    assert "旧摘要" not in chapter
+    assert "旧理由" not in chapter
     assert "第一段" in chapter
     assert "第二段" in chapter
 

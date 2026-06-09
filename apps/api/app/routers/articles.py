@@ -15,6 +15,7 @@ from app.models import (
     UserArticleState,
     UserFeedSubscription,
 )
+from app.services.ai_blocks import derive_reading_reason, derive_summary
 from app.services.analysis_events import (
     format_sse_event,
     get_redis_client,
@@ -114,9 +115,13 @@ def list_articles(
             "published_at": article.published_at.isoformat()
             if article.published_at
             else None,
-            "one_sentence_summary": article.ai_analysis.one_sentence_summary
-            if article.ai_analysis
-            else None,
+            "one_sentence_summary": (
+                derive_summary(article.ai_analysis.ai_blocks)
+                if article.ai_analysis and article.ai_analysis.ai_blocks
+                else article.ai_analysis.one_sentence_summary
+                if article.ai_analysis
+                else None
+            ),
             "reading_recommendation": article.ai_analysis.reading_recommendation.value
             if article.ai_analysis and article.ai_analysis.reading_recommendation
             else None,
@@ -140,16 +145,27 @@ def get_article(
         "source_title": article.feed.title,
         "published_at": article.published_at.isoformat() if article.published_at else None,
         "url": article.url,
-        "one_sentence_summary": article.ai_analysis.one_sentence_summary
-        if article.ai_analysis
-        else None,
+        "one_sentence_summary": (
+            derive_summary(article.ai_analysis.ai_blocks)
+            if article.ai_analysis and article.ai_analysis.ai_blocks
+            else article.ai_analysis.one_sentence_summary
+            if article.ai_analysis
+            else None
+        ),
         "reading_recommendation": article.ai_analysis.reading_recommendation.value
         if article.ai_analysis and article.ai_analysis.reading_recommendation
         else None,
-        "reading_reason": article.ai_analysis.reading_reason if article.ai_analysis else None,
+        "reading_reason": (
+            derive_reading_reason(article.ai_analysis.ai_blocks)
+            if article.ai_analysis and article.ai_analysis.ai_blocks
+            else article.ai_analysis.reading_reason
+            if article.ai_analysis
+            else None
+        ),
         "content_markdown": article.content.content_markdown if article.content else None,
         "extraction_status": article.content.extraction_status.value if article.content else None,
         "analysis_status": article.ai_analysis.analysis_status.value if article.ai_analysis else None,
+        "ai_blocks": article.ai_analysis.ai_blocks if article.ai_analysis else None,
     }
 
 

@@ -60,7 +60,13 @@ def register(client: TestClient, email: str = "user@example.com") -> dict:
     return response.json()
 
 
-def seed_article(client: TestClient, *, user_id: str, is_read: bool = False) -> UUID:
+def seed_article(
+    client: TestClient,
+    *,
+    user_id: str,
+    is_read: bool = False,
+    ai_blocks: list[dict] | None = None,
+) -> UUID:
     session_local = client.app.state.testing_session_local
     with session_local() as db:
         feed = Feed(
@@ -95,6 +101,7 @@ def seed_article(client: TestClient, *, user_id: str, is_read: bool = False) -> 
                 reading_recommendation=ReadingRecommendation.deep_read,
                 reading_reason="The article has durable insight.",
                 analysis_status=AnalysisStatus.success,
+                ai_blocks=ai_blocks,
             )
         )
         db.commit()
@@ -170,6 +177,40 @@ def test_list_articles_supports_design_read_filters(client: TestClient):
 
     assert client.get("/articles?status_filter=read").json() == []
     assert client.get("/articles?status_filter=favorites").status_code == 400
+
+
+def test_list_articles_derives_summary_from_ai_blocks(client: TestClient):
+    user = register(client)
+    ai_blocks = [
+        {
+            "type": "reading_question",
+            "title": "带读问题",
+            "content": "这篇文章要回答什么？",
+            "order": 10,
+        },
+        {
+            "type": "summary",
+            "title": "一句话摘要",
+            "content": "来自 block 的摘要。",
+            "order": 30,
+        },
+        {
+            "type": "reading_reason",
+            "title": "阅读理由",
+            "content": "来自 block 的理由。",
+            "order": 40,
+        },
+    ]
+    article_id = seed_article(client, user_id=user["id"], is_read=False, ai_blocks=ai_blocks)
+
+    unread_response = client.get("/articles?status_filter=unread")
+    unread_articles = unread_response.json()
+    assert unread_articles[0]["one_sentence_summary"] == "来自 block 的摘要。"
+
+    detail = client.get(f"/articles/{article_id}").json()
+    assert detail["ai_blocks"][0]["type"] == "reading_question"
+    assert detail["one_sentence_summary"] == "来自 block 的摘要。"
+    assert detail["reading_reason"] == "来自 block 的理由。"
 
 
 def test_detail_read_state_and_reanalysis_route_is_removed(client: TestClient):

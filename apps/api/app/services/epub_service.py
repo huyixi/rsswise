@@ -7,6 +7,7 @@ from uuid import NAMESPACE_URL, uuid5
 from zipfile import ZIP_DEFLATED, ZIP_STORED, ZipFile, ZipInfo
 
 from app.models import Article
+from app.services.ai_blocks import derive_reading_reason, derive_summary
 
 ZIP_TIMESTAMP = (1980, 1, 1, 0, 0, 0)
 
@@ -25,8 +26,8 @@ def article_chapter_xhtml(article: Article, index: int) -> str:
     summary = ""
     reason = ""
     if article.ai_analysis is not None:
-        summary = article.ai_analysis.one_sentence_summary or ""
-        reason = article.ai_analysis.reading_reason or ""
+        summary = derive_summary(article.ai_analysis.ai_blocks) or article.ai_analysis.one_sentence_summary or ""
+        reason = derive_reading_reason(article.ai_analysis.ai_blocks) or article.ai_analysis.reading_reason or ""
 
     source_title = article.feed.title if article.feed else ""
     article_body = markdown_to_xhtml(article.content.content_markdown if article.content else None)

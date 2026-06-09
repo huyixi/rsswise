@@ -103,7 +103,7 @@ def run_due_email_digest(db: Session, *, now: datetime | None = None) -> str:
             text_body=f"本次推送包含 {len(articles)} 篇文章，见附件 EPUB。",
             attachments=[
                 EmailAttachment(
-                    filename=f"rsswise-digest-{digest_date}.epub",
+                    filename=f"RSSWise-{digest_date}.epub",
                     content=epub,
                     content_type="application/epub+zip",
                 )

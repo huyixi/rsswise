@@ -728,7 +728,7 @@ def test_build_email_message_includes_attachment(monkeypatch: pytest.MonkeyPatch
         text_body="本次摘要包含 1 篇文章。",
         attachments=[
             EmailAttachment(
-                filename="rsswise-digest-2026-06-04.epub",
+                filename="RSSWise-2026-06-04.epub",
                 content=b"epub-bytes",
                 content_type="application/epub+zip",
             )
@@ -1545,7 +1545,7 @@ def run_due_email_digest(db: Session, *, now: datetime | None = None) -> str:
             text_body=f"本次 RSSWise 摘要包含 {len(articles)} 篇文章，见附件 EPUB。",
             attachments=[
                 EmailAttachment(
-                    filename=f"rsswise-digest-{digest_date}.epub",
+                    filename=f"RSSWise-{digest_date}.epub",
                     content=epub,
                     content_type="application/epub+zip",
                 )

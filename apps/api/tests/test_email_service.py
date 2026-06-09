@@ -22,7 +22,7 @@ def test_build_email_message_includes_attachment(monkeypatch: pytest.MonkeyPatch
         text_body="本次推送包含 1 篇文章。",
         attachments=[
             EmailAttachment(
-                filename="rsswise-digest-2026-06-04.epub",
+                filename="RSSWise-2026-06-04.epub",
                 content=b"epub-bytes",
                 content_type="application/epub+zip",
             )

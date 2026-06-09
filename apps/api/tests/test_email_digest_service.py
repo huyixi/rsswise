@@ -195,6 +195,7 @@ def test_run_due_email_digest_success_updates_last_sent_at(
     assert setting.last_run_date == date(2026, 6, 4)
     assert setting.last_sent_article_count == 1
     assert sent_messages[0]["to_email"] == "reader@example.com"
+    assert sent_messages[0]["attachments"][0].filename == "RSSWise-2026-06-04.epub"
 
 
 def test_run_due_email_digest_failure_does_not_update_last_sent_at(

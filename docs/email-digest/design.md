@@ -264,7 +264,7 @@ EPUB metadata：
 邮件附件名：
 
 ```text
-rsswise-digest-YYYY-MM-DD.epub
+RSSWise-YYYY-MM-DD.epub
 ```
 
 ## Email Content

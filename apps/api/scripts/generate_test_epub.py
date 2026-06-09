@@ -3,7 +3,7 @@
 Usage:
     cd apps/api && uv run python scripts/generate_test_epub.py [output_path]
 
-Output path defaults to ./rsswise-test-digest.epub
+Output path defaults to ./RSSWise-YYYY-MM-DD.epub
 """
 
 import sys
@@ -15,7 +15,11 @@ from app.services.email_digest_settings_service import get_or_create_email_diges
 from app.services.epub_service import build_digest_epub
 
 
-def main(output: Path) -> None:
+def default_epub_output_path(digest_date: str) -> Path:
+    return Path(f"RSSWise-{digest_date}.epub")
+
+
+def main(output: Path | None = None) -> None:
     with SessionLocal() as db:
         setting = get_or_create_email_digest_setting(db)
         articles = list_digest_articles(db, setting)
@@ -25,6 +29,7 @@ def main(output: Path) -> None:
             sys.exit(1)
 
         digest_date = now_in_digest_timezone().date().isoformat()
+        output = output or default_epub_output_path(digest_date)
         epub_bytes = build_digest_epub(articles, digest_date=digest_date)
 
         output.write_bytes(epub_bytes)
@@ -32,5 +37,5 @@ def main(output: Path) -> None:
 
 
 if __name__ == "__main__":
-    output_path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("rsswise-test-digest.epub")
-    main(output_path.resolve())
+    output_path = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else None
+    main(output_path)

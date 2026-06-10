@@ -46,6 +46,26 @@ class ReadingRecommendation(str, enum.Enum):
     skip = "skip"
 
 
+class FeedImportSourceType(str, enum.Enum):
+    opml = "opml"
+    urls = "urls"
+
+
+class FeedImportJobStatus(str, enum.Enum):
+    pending = "pending"
+    processing = "processing"
+    completed = "completed"
+    failed = "failed"
+
+
+class FeedImportItemStatus(str, enum.Enum):
+    pending = "pending"
+    created = "created"
+    subscribed = "subscribed"
+    skipped = "skipped"
+    failed = "failed"
+
+
 class Feed(Base):
     __tablename__ = "feeds"
 
@@ -226,6 +246,71 @@ class UserFeedSubscription(Base):
 
     user: Mapped[User] = relationship(back_populates="feed_subscriptions")
     feed: Mapped[Feed] = relationship()
+
+
+class FeedImportJob(Base):
+    __tablename__ = "feed_import_jobs"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        index=True,
+    )
+    source_type: Mapped[FeedImportSourceType] = mapped_column(
+        Enum(FeedImportSourceType, name="feed_import_source_type"),
+    )
+    status: Mapped[FeedImportJobStatus] = mapped_column(
+        Enum(FeedImportJobStatus, name="feed_import_job_status"),
+        default=FeedImportJobStatus.pending,
+        index=True,
+    )
+    total_count: Mapped[int] = mapped_column(Integer, default=0)
+    processed_count: Mapped[int] = mapped_column(Integer, default=0)
+    created_count: Mapped[int] = mapped_column(Integer, default=0)
+    subscribed_count: Mapped[int] = mapped_column(Integer, default=0)
+    skipped_count: Mapped[int] = mapped_column(Integer, default=0)
+    failed_count: Mapped[int] = mapped_column(Integer, default=0)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    user: Mapped[User] = relationship()
+    items: Mapped[list["FeedImportItem"]] = relationship(
+        back_populates="job",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="FeedImportItem.created_at",
+    )
+
+
+class FeedImportItem(Base):
+    __tablename__ = "feed_import_items"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    job_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("feed_import_jobs.id", ondelete="CASCADE"),
+        index=True,
+    )
+    source_title: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    raw_url: Mapped[str] = mapped_column(String(2000))
+    normalized_url: Mapped[str] = mapped_column(String(2000), index=True)
+    dedupe_key: Mapped[str] = mapped_column(String(2000), index=True)
+    status: Mapped[FeedImportItemStatus] = mapped_column(
+        Enum(FeedImportItemStatus, name="feed_import_item_status"),
+        default=FeedImportItemStatus.pending,
+        index=True,
+    )
+    feed_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("feeds.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    job: Mapped[FeedImportJob] = relationship(back_populates="items")
+    feed: Mapped[Feed | None] = relationship()
 
 
 class UserArticleState(Base):

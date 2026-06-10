@@ -45,6 +45,7 @@ jobs:
             cd ${{ vars.DEPLOY_PATH }}
             git fetch origin main
             git reset --hard origin/main
-            docker compose --env-file .env.compose.production -f docker-compose.prod.yml up -d --build --remove-orphans
+            docker compose -p rsswise --env-file .env.compose.production -f docker-compose.prod.yml down --remove-orphans
+            docker compose -p rsswise --env-file .env.compose.production -f docker-compose.prod.yml up -d --build
             docker compose --env-file .env.compose.production -f docker-compose.prod.yml exec -T api uv run --no-sync alembic upgrade head
             docker compose --env-file .env.compose.production -f docker-compose.prod.yml ps

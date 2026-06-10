@@ -24,6 +24,7 @@ services:
       retries: 5
 
   api:
+    image: rsswise-api:latest
     build: ./apps/api
     env_file:
       - ./apps/api/.env.production
@@ -39,7 +40,7 @@ services:
     restart: unless-stopped
 
   worker:
-    build: ./apps/api
+    image: rsswise-api:latest
     env_file:
       - ./apps/api/.env.production
     environment:
@@ -52,7 +53,7 @@ services:
     restart: unless-stopped
 
   beat:
-    build: ./apps/api
+    image: rsswise-api:latest
     env_file:
       - ./apps/api/.env.production
     environment:

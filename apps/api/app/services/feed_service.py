@@ -28,6 +28,12 @@ class ParsedFeed:
     items: list[ParsedFeedItem]
 
 
+@dataclass(frozen=True)
+class FeedSubscriptionResult:
+    status: str
+    feed: Feed
+
+
 def parse_feed_items(xml: str) -> ParsedFeed:
     feed = feedparser.parse(xml)
     items: list[ParsedFeedItem] = []
@@ -95,6 +101,10 @@ def list_feeds_for_api(db: Session, user: User) -> list[dict]:
 
 
 def add_feed_from_url(db: Session, url: str, user: User) -> Feed:
+    return add_or_subscribe_feed_from_url(db, url, user).feed
+
+
+def add_or_subscribe_feed_from_url(db: Session, url: str, user: User) -> FeedSubscriptionResult:
     feed = db.execute(select(Feed).where(Feed.url == url)).scalar_one_or_none()
     new_articles: list[Article] = []
 
@@ -108,14 +118,18 @@ def add_feed_from_url(db: Session, url: str, user: User) -> Feed:
         feed.last_fetched_at = datetime.now(UTC).replace(tzinfo=None)
         db.flush()
         new_articles = upsert_feed_articles(db, feed, parsed)
+        db.add(UserFeedSubscription(user_id=user.id, feed_id=feed.id))
+        db.commit()
+        enqueue_extraction(new_articles)
+        return FeedSubscriptionResult(status="created", feed=feed)
 
     subscription = db.get(UserFeedSubscription, (user.id, feed.id))
-    if subscription is None:
-        db.add(UserFeedSubscription(user_id=user.id, feed_id=feed.id))
+    if subscription is not None:
+        return FeedSubscriptionResult(status="skipped", feed=feed)
 
+    db.add(UserFeedSubscription(user_id=user.id, feed_id=feed.id))
     db.commit()
-    enqueue_extraction(new_articles)
-    return feed
+    return FeedSubscriptionResult(status="subscribed", feed=feed)
 
 
 def refresh_feed_by_id(db: Session, feed_id: UUID) -> int:

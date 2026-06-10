@@ -17,6 +17,10 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    op.execute("CREATE TYPE IF NOT EXISTS feed_import_source_type AS ENUM ('opml', 'urls')")
+    op.execute("CREATE TYPE IF NOT EXISTS feed_import_job_status AS ENUM ('pending', 'processing', 'completed', 'failed')")
+    op.execute("CREATE TYPE IF NOT EXISTS feed_import_item_status AS ENUM ('pending', 'created', 'subscribed', 'skipped', 'failed')")
+
     source_type = sa.Enum("opml", "urls", name="feed_import_source_type")
     job_status = sa.Enum("pending", "processing", "completed", "failed", name="feed_import_job_status")
     item_status = sa.Enum(
@@ -27,9 +31,6 @@ def upgrade() -> None:
         "failed",
         name="feed_import_item_status",
     )
-    source_type.create(op.get_bind(), checkfirst=True)
-    job_status.create(op.get_bind(), checkfirst=True)
-    item_status.create(op.get_bind(), checkfirst=True)
 
     op.create_table(
         "feed_import_jobs",

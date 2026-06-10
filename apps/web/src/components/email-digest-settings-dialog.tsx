@@ -453,33 +453,48 @@ function EmailDigestSettingsForm({
   );
 }
 
-export function EmailDigestSettingsDialog() {
-  const [open, setOpen] = useState(false);
-  const [formKey, setFormKey] = useState(0);
+export function EmailDigestSettingsDialog({
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
+}: {
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+} = {}) {
+  const isControlled = controlledOpen !== undefined && controlledOnOpenChange !== undefined
+  const [internalOpen, setInternalOpen] = useState(false)
+  const [formKey, setFormKey] = useState(0)
+
+  const open = isControlled ? controlledOpen : internalOpen
 
   const settingsQuery = useQuery({
     queryKey: queryKeys.settings.emailDigest(),
     queryFn: () => apiGet<EmailDigestSettings>("/settings/email-digest"),
     enabled: open,
-  });
-  const settings = settingsQuery.data;
+  })
+  const settings = settingsQuery.data
 
   const handleOpenChange = useCallback((nextOpen: boolean) => {
     if (!nextOpen) {
-      setFormKey((k) => k + 1);
+      setFormKey((k) => k + 1)
     }
-    setOpen(nextOpen);
-  }, []);
+    if (isControlled) {
+      controlledOnOpenChange!(nextOpen)
+    } else {
+      setInternalOpen(nextOpen)
+    }
+  }, [isControlled, controlledOnOpenChange])
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger
-        render={
-          <Button aria-label="文章推送设置" size="icon" variant="ghost" />
-        }
-      >
-        <SettingsIcon aria-hidden="true" />
-      </DialogTrigger>
+      {!isControlled && (
+        <DialogTrigger
+          render={
+            <Button aria-label="文章推送设置" size="icon" variant="ghost" />
+          }
+        >
+          <SettingsIcon aria-hidden="true" />
+        </DialogTrigger>
+      )}
       <DialogPopup>
         <DialogHeader>
           <DialogTitle>文章推送</DialogTitle>
@@ -499,5 +514,5 @@ export function EmailDigestSettingsDialog() {
         )}
       </DialogPopup>
     </Dialog>
-  );
+  )
 }

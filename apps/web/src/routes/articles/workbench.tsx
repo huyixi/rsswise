@@ -1,17 +1,20 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useMutation, useQuery } from "@tanstack/react-query"
 import { Link, useNavigate, useOutletContext, useSearchParams } from "react-router-dom"
 import {
   BookOpenIcon,
   InboxIcon,
-  LogOutIcon,
   PlusIcon,
   RssIcon,
-  UserIcon,
 } from "lucide-react"
 
 import { EmailDigestSettingsDialog } from "@/components/email-digest-settings-dialog"
-import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/menu"
 
 import { Spinner } from "@/components/ui/spinner"
 import { useIsMobile } from "@/hooks/use-media-query"
@@ -109,26 +112,44 @@ function WorkbenchSidebar({
   onSelectView: (view: ArticleView) => void
   onSelectRecommendation: (recommendation: RecommendationView) => void
 }) {
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false)
+
   return (
     <aside className="flex w-[220px] shrink-0 flex-col border-r bg-background px-3 py-3">
       <div className="flex items-center gap-2">
-        <h1 className="min-w-0 flex-1 truncate text-base font-semibold text-foreground">
+        <h1 className="min-w-0 truncate text-base font-semibold text-foreground">
           RSSWise
         </h1>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            className="min-w-0 flex-1 truncate rounded-md px-2 py-1 text-left text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            aria-label="用户菜单"
+          >
+            {userEmail ?? "当前用户"}
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" sideOffset={4}>
+            <DropdownMenuItem
+              closeOnClick
+              onSelect={() => setEmailDialogOpen(true)}
+            >
+              邮件摘要设置
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              closeOnClick
+              onSelect={onLogout}
+              disabled={isLoggingOut}
+            >
+              退出登录
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <Link
           to="/feeds"
           aria-label="添加 Feed"
-          className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         >
           <PlusIcon aria-hidden="true" className="size-4" />
         </Link>
-        <div
-          aria-label="当前用户"
-          title={userEmail}
-          className="inline-flex size-8 items-center justify-center rounded-full border bg-card text-muted-foreground"
-        >
-          <UserIcon aria-hidden="true" className="size-4" />
-        </div>
       </div>
 
       <nav className="mt-5 flex flex-1 flex-col gap-5" aria-label="文章导航">
@@ -170,24 +191,10 @@ function WorkbenchSidebar({
         </div>
       </nav>
 
-      <div className="mt-3 border-t pt-3">
-        <div className="truncate px-2.5 text-xs text-muted-foreground">
-          {userEmail ?? "当前用户"}
-        </div>
-        <div className="mt-2 flex items-center gap-1">
-          <EmailDigestSettingsDialog />
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            aria-label="退出登录"
-            loading={isLoggingOut}
-            onClick={onLogout}
-          >
-            <LogOutIcon aria-hidden="true" className="size-4" />
-          </Button>
-        </div>
-      </div>
+      <EmailDigestSettingsDialog
+        open={emailDialogOpen}
+        onOpenChange={setEmailDialogOpen}
+      />
     </aside>
   )
 }

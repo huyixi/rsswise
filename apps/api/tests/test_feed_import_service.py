@@ -9,7 +9,6 @@ from app.models import (
     Base,
     FeedImportItem,
     FeedImportItemStatus,
-    FeedImportJob,
     FeedImportJobStatus,
     FeedImportSourceType,
     User,

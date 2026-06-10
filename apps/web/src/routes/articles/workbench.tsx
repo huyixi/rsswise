@@ -18,7 +18,7 @@ import {
 import { Spinner } from "@/components/ui/spinner"
 import { useIsMobile } from "@/hooks/use-media-query"
 import { cn } from "@/lib/utils"
-import { apiGet, apiPost, type ArticleDetail, type ArticleListItem } from "@/lib/api"
+import { apiGet, apiPost, type ArticleDetail, type ArticleListItem, type Feed } from "@/lib/api"
 import { queryClient } from "@/lib/query-client"
 import { queryKeys } from "@/lib/query-keys"
 import {
@@ -87,29 +87,27 @@ function navButtonClassName(active: boolean) {
   )
 }
 
-function streamTitle(view: ArticleView, recommendation: RecommendationView | null) {
-  if (recommendation) {
-    return recommendationNavItems.find((item) => item.recommendation === recommendation)?.label ?? "AI"
-  }
-  return primaryNavItems.find((item) => item.view === view)?.label ?? "All Articles"
+function toggleButtonClassName(active: boolean) {
+  return cn(
+    "flex-1 rounded px-2 py-1 text-center text-xs font-medium transition-colors",
+    active ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+  )
 }
 
 function WorkbenchSidebar({
-  view,
-  recommendation,
+  feeds,
+  feedId,
+  onSelectFeed,
   userEmail,
   isLoggingOut,
   onLogout,
-  onSelectView,
-  onSelectRecommendation,
 }: {
-  view: ArticleView
-  recommendation: RecommendationView | null
+  feeds: Feed[] | undefined
+  feedId: string | null
+  onSelectFeed: (id: string | null) => void
   userEmail: string | undefined
   isLoggingOut: boolean
   onLogout: () => void
-  onSelectView: (view: ArticleView) => void
-  onSelectRecommendation: (recommendation: RecommendationView) => void
 }) {
   const [emailDialogOpen, setEmailDialogOpen] = useState(false)
 
@@ -128,34 +126,50 @@ function WorkbenchSidebar({
         </Link>
       </div>
 
-      <nav className="mt-5 flex flex-1 flex-col gap-5" aria-label="文章导航">
-        <div className="flex flex-col gap-1">
-          {primaryNavItems.map((item) => (
-            <button
-              key={item.view}
-              type="button"
-              className={navButtonClassName(!recommendation && view === item.view)}
-              onClick={() => onSelectView(item.view)}
-            >
-              <span>{item.label}</span>
-            </button>
-          ))}
-        </div>
+      <nav className="mt-5 flex flex-1 flex-col gap-1 overflow-hidden" aria-label="Feed 导航">
+        <button
+          type="button"
+          className={navButtonClassName(feedId === null)}
+          onClick={() => onSelectFeed(null)}
+        >
+          <span>All Articles</span>
+        </button>
 
-        <div className="flex flex-col gap-1">
-          <div className="px-2.5 text-xs font-medium text-muted-foreground">AI</div>
-          {recommendationNavItems.map((item) => (
-            <button
-              key={item.recommendation}
-              type="button"
-              className={navButtonClassName(recommendation === item.recommendation)}
-              onClick={() => onSelectRecommendation(item.recommendation)}
-            >
-              <span>{item.label}</span>
-            </button>
-          ))}
-        </div>
+        <div className="mx-2 border-t my-1" />
 
+        <div className="flex-1 overflow-y-auto">
+          {feeds === undefined ? (
+            <div className="flex flex-col gap-1 px-2.5">
+              <div className="h-5 w-3/5 animate-pulse rounded bg-muted" />
+              <div className="h-5 w-4/5 animate-pulse rounded bg-muted" />
+              <div className="h-5 w-2/5 animate-pulse rounded bg-muted" />
+            </div>
+          ) : feeds.length === 0 ? (
+            <p className="px-2.5 py-1 text-sm text-muted-foreground">
+              <Link to="/feeds" className="underline transition-colors hover:text-foreground">
+                暂无订阅
+              </Link>
+            </p>
+          ) : (
+            feeds.map((feed) => (
+              <button
+                key={feed.id}
+                type="button"
+                className={navButtonClassName(feed.id === feedId)}
+                onClick={() => onSelectFeed(feed.id)}
+              >
+                {feed.favicon_url ? (
+                  <img
+                    src={feed.favicon_url}
+                    alt=""
+                    className="size-3.5 shrink-0 rounded-sm"
+                  />
+                ) : null}
+                <span className="truncate">{feed.title ?? feed.url}</span>
+              </button>
+            ))
+          )}
+        </div>
       </nav>
 
       <div className="border-t pt-3">
@@ -208,7 +222,11 @@ function ArticleListPanel({
   articles,
   selectedId,
   onSelect,
-  title,
+  view,
+  recommendation,
+  onSelectView,
+  onSelectRecommendation,
+  feedName,
   isLoading,
   isError,
   errorMessage,
@@ -216,15 +234,45 @@ function ArticleListPanel({
   articles: ArticleListItem[] | undefined
   selectedId: string | null
   onSelect: (id: string) => void
-  title: string
+  view: ArticleView
+  recommendation: RecommendationView | null
+  onSelectView: (view: ArticleView) => void
+  onSelectRecommendation: (recommendation: RecommendationView) => void
+  feedName: string | null
   isLoading: boolean
   isError: boolean
   errorMessage: string
 }) {
   return (
     <aside className="flex w-[320px] shrink-0 flex-col border-r bg-background max-lg:w-full max-lg:border-r-0 max-lg:border-b">
-      <div className="border-b px-4 py-3">
-        <h2 className="text-sm font-semibold text-foreground">{title}</h2>
+      <div className="border-b px-3 py-2">
+        {feedName ? (
+          <p className="mb-1.5 truncate text-xs font-medium text-muted-foreground">{feedName}</p>
+        ) : null}
+        <div className="mb-1.5 flex gap-0.5 rounded-md bg-muted p-0.5">
+          {primaryNavItems.map((item) => (
+            <button
+              key={item.view}
+              type="button"
+              className={toggleButtonClassName(view === item.view)}
+              onClick={() => onSelectView(item.view)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-0.5 rounded-md bg-muted p-0.5">
+          {recommendationNavItems.map((item) => (
+            <button
+              key={item.recommendation}
+              type="button"
+              className={toggleButtonClassName(recommendation === item.recommendation)}
+              onClick={() => onSelectRecommendation(item.recommendation)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto">
@@ -373,14 +421,22 @@ export function ArticleWorkbenchPage() {
 
   const appChrome = useOutletContext<AppChromeContext>()
 
+  const feedId = searchParams.get("feed_id")
+
+  const feedsQuery = useQuery({
+    queryKey: queryKeys.feeds.list(),
+    queryFn: () => apiGet<Feed[]>("/feeds"),
+  })
+
   const markedReadIdRef = useRef<string | null>(null)
 
   const articlesQuery = useQuery({
     queryKey: queryKeys.articles.list(status),
-    queryFn: () =>
-      apiGet<ArticleListItem[]>(
-        `/articles?status_filter=${encodeURIComponent(status)}`,
-      ),
+    queryFn: () => {
+      let url = `/articles?status_filter=${encodeURIComponent(status)}`
+      if (feedId) url += `&feed_id=${encodeURIComponent(feedId)}`
+      return apiGet<ArticleListItem[]>(url)
+    },
   })
 
   const visibleArticles = (articlesQuery.data ?? []).filter((article) => {
@@ -487,11 +543,28 @@ export function ArticleWorkbenchPage() {
     })
   }
 
+  function handleSelectFeed(nextFeedId: string | null) {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      next.delete("id")
+      if (nextFeedId === null) {
+        next.delete("feed_id")
+      } else if (prev.get("feed_id") === nextFeedId) {
+        next.delete("feed_id")
+      } else {
+        next.set("feed_id", nextFeedId)
+      }
+      return next
+    })
+  }
+
+  const selectedFeed = feedsQuery.data?.find((f) => f.id === feedId)
+  const feedName = selectedFeed?.title ?? selectedFeed?.url ?? null
+
   function handleSelectView(nextView: ArticleView) {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev)
       next.delete("id")
-      next.delete("recommendation")
       next.delete("status")
       if (nextView === "unread") {
         next.set("view", "unread")
@@ -509,9 +582,11 @@ export function ArticleWorkbenchPage() {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev)
       next.delete("id")
-      next.delete("view")
-      next.delete("status")
-      next.set("recommendation", nextRecommendation)
+      if (prev.get("recommendation") === nextRecommendation) {
+        next.delete("recommendation")
+      } else {
+        next.set("recommendation", nextRecommendation)
+      }
       return next
     })
   }
@@ -523,7 +598,11 @@ export function ArticleWorkbenchPage() {
           articles={visibleArticles}
           selectedId={selectedId}
           onSelect={handleSelectArticle}
-          title={streamTitle(view, recommendation)}
+          view={view}
+          recommendation={recommendation}
+          onSelectView={handleSelectView}
+          onSelectRecommendation={handleSelectRecommendation}
+          feedName={feedName}
           isLoading={articlesQuery.isLoading}
           isError={articlesQuery.isError}
           errorMessage={articlesQuery.error?.message ?? "加载文章列表失败"}
@@ -535,20 +614,23 @@ export function ArticleWorkbenchPage() {
   return (
     <div className="flex h-screen overflow-hidden">
       <WorkbenchSidebar
-        view={view}
-        recommendation={recommendation}
+        feeds={feedsQuery.data}
+        feedId={feedId}
+        onSelectFeed={handleSelectFeed}
         userEmail={appChrome.email}
         isLoggingOut={appChrome.isLoggingOut}
         onLogout={appChrome.onLogout}
-        onSelectView={handleSelectView}
-        onSelectRecommendation={handleSelectRecommendation}
       />
 
       <ArticleListPanel
         articles={visibleArticles}
         selectedId={selectedId}
         onSelect={handleSelectArticle}
-        title={streamTitle(view, recommendation)}
+        view={view}
+        recommendation={recommendation}
+        onSelectView={handleSelectView}
+        onSelectRecommendation={handleSelectRecommendation}
+        feedName={feedName}
         isLoading={articlesQuery.isLoading}
         isError={articlesQuery.isError}
         errorMessage={articlesQuery.error?.message ?? "加载文章列表失败"}

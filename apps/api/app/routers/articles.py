@@ -78,6 +78,7 @@ def set_read_state(db: Session, user: User, article_id: UUID, is_read: bool) -> 
 @router.get("")
 def list_articles(
     status_filter: str = "all",
+    feed_id: UUID | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -99,6 +100,8 @@ def list_articles(
         .options(joinedload(Article.feed), joinedload(Article.ai_analysis))
         .order_by(Article.published_at.desc().nullslast(), Article.created_at.desc())
     )
+    if feed_id is not None:
+        statement = statement.where(Article.feed_id == feed_id)
     if status_filter == "read":
         statement = statement.where(UserArticleState.is_read.is_(True))
     if status_filter == "unread":

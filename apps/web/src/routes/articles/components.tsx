@@ -75,6 +75,16 @@ export function ArticleHeader({
   )
 }
 
+export function ArticleMetadata({ article }: { article: ArticleDetail }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+      <span className="font-medium text-foreground">{article.source_title}</span>
+      <span aria-hidden="true">/</span>
+      <span>{formatArticleDate(article.published_at)}</span>
+    </div>
+  )
+}
+
 export function ArticleAiSummary({
   article,
   className,

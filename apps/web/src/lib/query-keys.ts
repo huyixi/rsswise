@@ -11,6 +11,10 @@ export const queryKeys = {
     all: ["feeds"] as const,
     list: () => ["feeds", "list"] as const,
   },
+  feedImports: {
+    all: ["feedImports"] as const,
+    detail: (id: string) => ["feedImports", id] as const,
+  },
   settings: {
     all: ["settings"] as const,
     emailDigest: () => ["settings", "email-digest"] as const,

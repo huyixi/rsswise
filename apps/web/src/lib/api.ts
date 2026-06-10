@@ -80,6 +80,44 @@ export type Feed = {
   created_at?: string;
 };
 
+export type FeedImportSourceType = "opml" | "urls";
+export type FeedImportJobStatus = "pending" | "processing" | "completed" | "failed";
+export type FeedImportItemStatus = "pending" | "created" | "subscribed" | "skipped" | "failed";
+
+export type FeedImportItem = {
+  id: string;
+  source_title: string | null;
+  raw_url: string;
+  normalized_url: string;
+  dedupe_key: string;
+  status: FeedImportItemStatus;
+  feed_id: string | null;
+  message: string | null;
+  created_at: string;
+  processed_at: string | null;
+};
+
+export type FeedImportJob = {
+  id: string;
+  source_type: FeedImportSourceType;
+  status: FeedImportJobStatus;
+  total_count: number;
+  processed_count: number;
+  created_count: number;
+  subscribed_count: number;
+  skipped_count: number;
+  failed_count: number;
+  error_message: string | null;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+  items: FeedImportItem[];
+};
+
+export type FeedImportCreateRequest =
+  | { source_type: "urls"; urls_text: string }
+  | { source_type: "opml"; opml_xml: string };
+
 export type EmailDigestSettings = {
   recipient_email: string | null;
   enabled: boolean;

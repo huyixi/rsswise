@@ -23,6 +23,8 @@ make dev-up
 make db-migrate
 ```
 
+`make install` installs backend dependencies, frontend dependencies, the repository-level Lefthook dependency, and local Git hooks.
+
 Run the local application processes in separate terminals:
 
 ```bash
@@ -44,8 +46,24 @@ The existing full-stack Docker Compose workflow is still available with `docker 
 
 ## Checks
 
+Run the full local check suite:
+
 ```bash
 make check
+```
+
+Local Git hooks are installed by `make install`.
+
+- `git commit` runs a fast `pre-commit` env-safety check.
+- `git push` runs `pre-push`, which executes the full `make check`.
+- `make hooks-run-pre-commit` runs the pre-commit hook manually.
+- `make hooks-run-pre-push` runs the pre-push hook manually.
+
+Emergency bypasses are available through Git's native flags, but should not be part of normal development:
+
+```bash
+git commit --no-verify -m "..."
+git push --no-verify
 ```
 
 ## Production Environment

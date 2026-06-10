@@ -487,7 +487,7 @@ export function ArticleWorkbenchPage() {
   const markedReadIdRef = useRef<string | null>(null)
 
   const articlesQuery = useQuery({
-    queryKey: queryKeys.articles.list(status),
+    queryKey: queryKeys.articles.list(status, feedId),
     queryFn: () => {
       let url = `/articles?status_filter=${encodeURIComponent(status)}`
       if (feedId) url += `&feed_id=${encodeURIComponent(feedId)}`

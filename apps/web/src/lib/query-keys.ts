@@ -4,7 +4,8 @@ export const queryKeys = {
   },
   articles: {
     all: ["articles"] as const,
-    list: (status: string) => ["articles", "list", { status }] as const,
+    list: (status: string, feedId?: string | null) =>
+      ["articles", "list", { status, feedId: feedId || undefined }] as const,
     detail: (id: string) => ["articles", "detail", id] as const,
   },
   feeds: {

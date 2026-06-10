@@ -8,7 +8,7 @@ import { useIsMobile } from "@/hooks/use-media-query"
 import { apiGet, apiPost, type ArticleDetail } from "@/lib/api"
 import { queryClient } from "@/lib/query-client"
 import { queryKeys } from "@/lib/query-keys"
-import { ArticleAiSummary, ArticleBody, ArticleHeader } from "./components"
+import { ArticleAiSummary, ArticleBody, ArticleMetadata } from "./components"
 
 function MobileArticleDetailContent({ id }: { id: string }) {
   const markedReadIdRef = useRef<string | null>(null)
@@ -83,9 +83,14 @@ function MobileArticleDetailContent({ id }: { id: string }) {
         返回文章列表
       </Link>
 
-      <ArticleHeader article={article} titleClassName="text-2xl" />
+      <header className="flex flex-col gap-3">
+        <h1 className="text-2xl font-semibold leading-tight text-foreground">
+          {article.title}
+        </h1>
+        <ArticleMetadata article={article} />
+      </header>
       <ArticleAiSummary article={article} />
-      <ArticleBody contentMarkdown={article.content_markdown} className="pt-5" />
+      <ArticleBody contentMarkdown={article.content_markdown} className="pt-0" />
     </article>
   )
 }

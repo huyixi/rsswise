@@ -159,6 +159,11 @@ def refresh_feed_task(feed_id: str) -> None:
         refresh_feed_by_id(db, UUID(feed_id))
 
 
+@celery_app.task(name="feeds.import")
+def import_feeds_task(job_id: str) -> None:
+    return None
+
+
 @celery_app.task(name="email_digest.run_due")
 def run_due_email_digest_task() -> str:
     with SessionLocal() as db:

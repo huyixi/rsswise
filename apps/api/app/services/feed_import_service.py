@@ -2,6 +2,16 @@ from dataclasses import dataclass
 from urllib.parse import urlparse
 from xml.etree import ElementTree
 
+from sqlalchemy import select
+from sqlalchemy.orm import Session, selectinload
+
+from app.models import (
+    FeedImportItem,
+    FeedImportJob,
+    FeedImportSourceType,
+    User,
+)
+
 MAX_FEED_IMPORT_URLS = 200
 
 
@@ -86,3 +96,43 @@ def prepare_import_candidates(candidates: list[FeedImportCandidate]) -> Prepared
         raise ValueError(f"单次最多导入 {MAX_FEED_IMPORT_URLS} 个 Feed")
 
     return PreparedFeedImport(items=items, unique_count=len(unique_keys))
+
+
+def create_feed_import_job(
+    db: Session,
+    user: User,
+    source_type: FeedImportSourceType,
+    prepared: PreparedFeedImport,
+) -> FeedImportJob:
+    job = FeedImportJob(
+        user_id=user.id,
+        source_type=source_type,
+        total_count=len(prepared.items),
+    )
+    db.add(job)
+    db.flush()
+
+    for prepared_item in prepared.items:
+        db.add(
+            FeedImportItem(
+                job_id=job.id,
+                source_title=prepared_item.source_title,
+                raw_url=prepared_item.raw_url,
+                normalized_url=prepared_item.normalized_url,
+                dedupe_key=prepared_item.dedupe_key,
+            )
+        )
+
+    db.commit()
+    return get_feed_import_job_for_user(db, user, job.id)
+
+
+def get_feed_import_job_for_user(db: Session, user: User, job_id) -> FeedImportJob:
+    job = db.execute(
+        select(FeedImportJob)
+        .options(selectinload(FeedImportJob.items))
+        .where(FeedImportJob.id == job_id, FeedImportJob.user_id == user.id)
+    ).scalar_one_or_none()
+    if job is None:
+        raise ValueError("import not found")
+    return job

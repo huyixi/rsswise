@@ -1,0 +1,9 @@
+pre-commit:
+  commands:
+    env-safety:
+      run: 'cd "$(git rev-parse --show-toplevel)" && scripts/check-env-safety.sh'
+
+pre-push:
+  commands:
+    check:
+      run: 'cd "$(git rev-parse --show-toplevel)" && make check'

@@ -5,7 +5,14 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator, model_validator
 
-from app.models import AnalysisStatus, ExtractionStatus, ReadingRecommendation
+from app.models import (
+    AnalysisStatus,
+    ExtractionStatus,
+    FeedImportItemStatus,
+    FeedImportJobStatus,
+    FeedImportSourceType,
+    ReadingRecommendation,
+)
 
 
 class HighlightBlockItem(BaseModel):
@@ -63,6 +70,54 @@ AiBlock = (
 
 class FeedCreate(BaseModel):
     url: HttpUrl
+
+
+class FeedImportCreate(BaseModel):
+    source_type: FeedImportSourceType
+    urls_text: str | None = None
+    opml_xml: str | None = None
+
+    @model_validator(mode="after")
+    def validate_source_payload(self) -> "FeedImportCreate":
+        if self.source_type == FeedImportSourceType.urls and not (self.urls_text or "").strip():
+            raise ValueError("urls_text is required for URL imports")
+        if self.source_type == FeedImportSourceType.opml and not (self.opml_xml or "").strip():
+            raise ValueError("opml_xml is required for OPML imports")
+        return self
+
+
+class FeedImportItemRead(BaseModel):
+    id: UUID
+    source_title: str | None
+    raw_url: str
+    normalized_url: str
+    dedupe_key: str
+    status: FeedImportItemStatus
+    feed_id: UUID | None
+    message: str | None
+    created_at: datetime
+    processed_at: datetime | None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class FeedImportJobRead(BaseModel):
+    id: UUID
+    source_type: FeedImportSourceType
+    status: FeedImportJobStatus
+    total_count: int
+    processed_count: int
+    created_count: int
+    subscribed_count: int
+    skipped_count: int
+    failed_count: int
+    error_message: str | None
+    created_at: datetime
+    started_at: datetime | None
+    finished_at: datetime | None
+    items: list[FeedImportItemRead] = []
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AuthRequest(BaseModel):

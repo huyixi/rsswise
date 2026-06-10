@@ -2,9 +2,11 @@ import { useEffect, useRef, useState } from "react"
 import { useMutation, useQuery } from "@tanstack/react-query"
 import { Link, useNavigate, useOutletContext, useSearchParams } from "react-router-dom"
 import {
+  ArrowLeftIcon,
   BookOpenIcon,
   InboxIcon,
   PlusIcon,
+  XIcon,
 } from "lucide-react"
 
 import { EmailDigestSettingsDialog } from "@/components/email-digest-settings-dialog"
@@ -26,6 +28,7 @@ import {
   ArticleBody,
   ArticleMetadata,
 } from "./components"
+import { FeedManagementContent } from "../feeds/list"
 
 type ArticleView = "all" | "today" | "unread"
 type RecommendationView = "deep_read" | "skim" | "skip"
@@ -101,6 +104,8 @@ function WorkbenchSidebar({
   userEmail,
   isLoggingOut,
   onLogout,
+  isFeedPanelOpen,
+  onToggleFeedPanel,
 }: {
   feeds: Feed[] | undefined
   feedId: string | null
@@ -108,6 +113,8 @@ function WorkbenchSidebar({
   userEmail: string | undefined
   isLoggingOut: boolean
   onLogout: () => void
+  isFeedPanelOpen: boolean
+  onToggleFeedPanel: () => void
 }) {
   const [emailDialogOpen, setEmailDialogOpen] = useState(false)
 
@@ -117,13 +124,18 @@ function WorkbenchSidebar({
         <h1 className="min-w-0 text-base font-semibold text-foreground">
           RSSWise
         </h1>
-        <Link
-          to="/feeds"
-          aria-label="添加 Feed"
+        <button
+          type="button"
+          onClick={onToggleFeedPanel}
+          aria-label={isFeedPanelOpen ? "关闭 Feed 管理" : "添加 Feed"}
           className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         >
-          <PlusIcon aria-hidden="true" className="size-4" />
-        </Link>
+          {isFeedPanelOpen ? (
+            <XIcon aria-hidden="true" className="size-4" />
+          ) : (
+            <PlusIcon aria-hidden="true" className="size-4" />
+          )}
+        </button>
       </div>
 
       <nav className="mt-5 flex flex-1 flex-col gap-1 overflow-hidden" aria-label="Feed 导航">
@@ -410,6 +422,48 @@ function ArticleContentPanel({
   )
 }
 
+function FeedPanel({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="flex flex-1 flex-col overflow-hidden bg-card">
+      <div className="flex shrink-0 items-center justify-between border-b px-4 py-3">
+        <h2 className="text-sm font-semibold text-foreground">Feed 管理</h2>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="关闭 Feed 管理"
+          className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        >
+          <XIcon aria-hidden="true" className="size-4" />
+        </button>
+      </div>
+      <div className="flex-1 overflow-y-auto p-4">
+        <FeedManagementContent />
+      </div>
+    </div>
+  )
+}
+
+function MobileFeedPanel({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-background">
+      <div className="flex shrink-0 items-center gap-2 border-b px-4 py-3">
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="返回"
+          className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        >
+          <ArrowLeftIcon aria-hidden="true" className="size-4" />
+        </button>
+        <h2 className="text-sm font-semibold text-foreground">Feed 管理</h2>
+      </div>
+      <div className="flex-1 overflow-y-auto p-4">
+        <FeedManagementContent />
+      </div>
+    </div>
+  )
+}
+
 export function ArticleWorkbenchPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const selectedId = searchParams.get("id")
@@ -420,6 +474,8 @@ export function ArticleWorkbenchPage() {
   const isMobile = useIsMobile()
 
   const appChrome = useOutletContext<AppChromeContext>()
+
+  const [isFeedPanelOpen, setIsFeedPanelOpen] = useState(false)
 
   const feedId = searchParams.get("feed_id")
 
@@ -452,7 +508,7 @@ export function ArticleWorkbenchPage() {
   const articleQuery = useQuery({
     queryKey: queryKeys.articles.detail(selectedId ?? ""),
     queryFn: () => apiGet<ArticleDetail>(`/articles/${selectedId}`),
-    enabled: Boolean(selectedId) && !isMobile,
+    enabled: Boolean(selectedId) && !isMobile && !isFeedPanelOpen,
     refetchInterval: (query) => {
       const data = query.state.data
       if (!data) return false
@@ -485,7 +541,7 @@ export function ArticleWorkbenchPage() {
   }, [isMobile, selectedId, markReadMutation])
 
   useEffect(() => {
-    if (isMobile) return
+    if (isMobile || isFeedPanelOpen) return
     if (visibleArticles.length === 0) return
     if (selectedId && visibleArticles.some((article) => article.id === selectedId)) return
 
@@ -494,12 +550,13 @@ export function ArticleWorkbenchPage() {
       next.set("id", visibleArticles[0].id)
       return next
     })
-  }, [isMobile, visibleArticles, selectedId, setSearchParams])
+  }, [isMobile, isFeedPanelOpen, visibleArticles, selectedId, setSearchParams])
 
   useEffect(() => {
     if (isMobile) return
 
     function handleKeyDown(event: KeyboardEvent) {
+      if (isFeedPanelOpen) return
       if (visibleArticles.length === 0) return
       if (!selectedId) return
 
@@ -528,7 +585,7 @@ export function ArticleWorkbenchPage() {
 
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [isMobile, visibleArticles, selectedId, setSearchParams])
+  }, [isMobile, isFeedPanelOpen, visibleArticles, selectedId, setSearchParams])
 
   function handleSelectArticle(id: string) {
     if (isMobile) {
@@ -592,8 +649,25 @@ export function ArticleWorkbenchPage() {
   }
 
   if (isMobile) {
+    if (isFeedPanelOpen) {
+      return (
+        <MobileFeedPanel onClose={() => setIsFeedPanelOpen(false)} />
+      )
+    }
+
     return (
-      <div className="min-h-[calc(100vh-49px)] bg-background">
+      <div className="min-h-screen bg-background">
+        <div className="flex items-center justify-between border-b px-4 py-2">
+          <h1 className="text-sm font-semibold text-foreground">RSSWise</h1>
+          <button
+            type="button"
+            onClick={() => setIsFeedPanelOpen(true)}
+            aria-label="添加 Feed"
+            className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <PlusIcon aria-hidden="true" className="size-4" />
+          </button>
+        </div>
         <ArticleListPanel
           articles={visibleArticles}
           selectedId={selectedId}
@@ -620,28 +694,36 @@ export function ArticleWorkbenchPage() {
         userEmail={appChrome.email}
         isLoggingOut={appChrome.isLoggingOut}
         onLogout={appChrome.onLogout}
+        isFeedPanelOpen={isFeedPanelOpen}
+        onToggleFeedPanel={() => setIsFeedPanelOpen((open) => !open)}
       />
 
-      <ArticleListPanel
-        articles={visibleArticles}
-        selectedId={selectedId}
-        onSelect={handleSelectArticle}
-        view={view}
-        recommendation={recommendation}
-        onSelectView={handleSelectView}
-        onSelectRecommendation={handleSelectRecommendation}
-        feedName={feedName}
-        isLoading={articlesQuery.isLoading}
-        isError={articlesQuery.isError}
-        errorMessage={articlesQuery.error?.message ?? "加载文章列表失败"}
-      />
+      {isFeedPanelOpen ? (
+        <FeedPanel onClose={() => setIsFeedPanelOpen(false)} />
+      ) : (
+        <>
+          <ArticleListPanel
+            articles={visibleArticles}
+            selectedId={selectedId}
+            onSelect={handleSelectArticle}
+            view={view}
+            recommendation={recommendation}
+            onSelectView={handleSelectView}
+            onSelectRecommendation={handleSelectRecommendation}
+            feedName={feedName}
+            isLoading={articlesQuery.isLoading}
+            isError={articlesQuery.isError}
+            errorMessage={articlesQuery.error?.message ?? "加载文章列表失败"}
+          />
 
-      <ArticleContentPanel
-        article={articleQuery.data}
-        isLoading={articleQuery.isLoading}
-        isError={articleQuery.isError}
-        errorMessage={articleQuery.error?.message ?? "加载文章失败"}
-      />
+          <ArticleContentPanel
+            article={articleQuery.data}
+            isLoading={articleQuery.isLoading}
+            isError={articleQuery.isError}
+            errorMessage={articleQuery.error?.message ?? "加载文章失败"}
+          />
+        </>
+      )}
     </div>
   )
 }

@@ -52,11 +52,7 @@ function SkeletonCard() {
   )
 }
 
-export function FeedsPage() {
-  useEffect(() => {
-    document.title = "Feed 管理 - RSSWise"
-  }, [])
-
+export function FeedManagementContent() {
   const feedsQuery = useQuery({
     queryKey: queryKeys.feeds.list(),
     queryFn: () => apiGet<Feed[]>("/feeds"),
@@ -172,12 +168,7 @@ export function FeedsPage() {
   )
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center gap-2">
-        <RssIcon aria-hidden="true" className="size-4 text-muted-foreground" />
-        <h1 className="text-xl font-semibold text-foreground">Feed 管理</h1>
-      </div>
-
+    <>
       <form
         onSubmit={handleAddFeed}
         className="rounded-lg border bg-card p-4"
@@ -401,6 +392,22 @@ export function FeedsPage() {
           })
         )}
       </div>
+    </>
+  )
+}
+
+export function FeedsPage() {
+  useEffect(() => {
+    document.title = "Feed 管理 - RSSWise"
+  }, [])
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center gap-2">
+        <RssIcon aria-hidden="true" className="size-4 text-muted-foreground" />
+        <h1 className="text-xl font-semibold text-foreground">Feed 管理</h1>
+      </div>
+      <FeedManagementContent />
     </div>
   )
 }

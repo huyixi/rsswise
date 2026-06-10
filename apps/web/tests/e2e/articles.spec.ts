@@ -28,9 +28,9 @@ const articleList = [
     title: "流式 AI 摘要测试",
     source_title: "RSSWise 测试源",
     published_at: "2026-06-06T08:00:00Z",
-    one_sentence_summary: null,
-    reading_recommendation: null,
-    is_read: false,
+    one_sentence_summary: "这是一篇应该跳过的测试文章",
+    reading_recommendation: "skip",
+    is_read: true,
   },
 ]
 
@@ -121,8 +121,8 @@ const streamingArticleDetail = {
   source_title: "RSSWise 测试源",
   published_at: "2026-06-06T08:00:00Z",
   url: "https://example.com/streaming-ai-article",
-  one_sentence_summary: null,
-  reading_recommendation: null,
+  one_sentence_summary: "这是一篇应该跳过的测试文章",
+  reading_recommendation: "skip",
   reading_reason: null,
   content_markdown: "## 流式正文\n\n这是流式测试正文。",
   extraction_status: "success",
@@ -425,4 +425,87 @@ test("mobile detail shows streaming AI summary text", async ({ page }) => {
   await expect(page.getByText("这篇文章正在生成什么问题？")).toBeVisible()
   await expect(page.getByRole("heading", { name: "带读问题" })).toBeVisible()
   await expect(page.getByText("重新 AI 分析")).toHaveCount(0)
+})
+
+test("desktop article workbench shows Folo-style navigation", async ({ page }) => {
+  await mockAuthenticatedUser(page)
+  await mockArticleRoutes(page)
+  await mockReadRoute(page)
+
+  await page.goto("/articles")
+
+  await expect(page.getByRole("heading", { name: "RSSWise" })).toBeVisible()
+  await expect(page.getByRole("link", { name: "添加 Feed" })).toHaveAttribute(
+    "href",
+    "/feeds",
+  )
+  await expect(page.getByLabel("当前用户")).toBeVisible()
+  await expect(page.getByRole("button", { name: "Today" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "Unread" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "All Articles" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "Deep Read" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "Skim" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "Skip" })).toBeVisible()
+  await expect(page.getByRole("link", { name: "Feeds" })).toHaveAttribute(
+    "href",
+    "/feeds",
+  )
+})
+
+test("article stream only shows title and summary", async ({ page }) => {
+  await mockAuthenticatedUser(page)
+  await mockArticleRoutes(page)
+  await mockReadRoute(page)
+
+  await page.goto("/articles")
+
+  const firstRow = page.getByRole("button", { name: /移动端文章详情测试/ })
+  await expect(firstRow).toContainText("移动端文章详情测试")
+  await expect(firstRow).toContainText("这是一句话 AI 摘要")
+  await expect(firstRow).not.toContainText("RSSWise 测试源")
+  await expect(firstRow).not.toContainText("2026")
+})
+
+test("recommendation navigation filters the article stream", async ({ page }) => {
+  await mockAuthenticatedUser(page)
+  await mockArticleRoutes(page)
+  await mockReadRoute(page)
+
+  await page.goto("/articles")
+  await page.getByRole("button", { name: "Deep Read" }).click()
+
+  await expect(page).toHaveURL(/recommendation=deep_read/)
+  await expect(page.getByRole("button", { name: /移动端文章详情测试/ })).toBeVisible()
+  await expect(page.getByRole("button", { name: /第二篇桌面键盘测试/ })).toHaveCount(0)
+  await expect(page.getByRole("button", { name: /流式 AI 摘要测试/ })).toHaveCount(0)
+})
+
+test("desktop reader shows title metadata AI block then body", async ({ page }) => {
+  await mockAuthenticatedUser(page)
+  await mockArticleRoutes(page)
+  await mockReadRoute(page)
+
+  await page.goto(`/articles?id=${firstArticleId}`)
+
+  const title = page.getByRole("heading", { name: "移动端文章详情测试" })
+  const metadata = page.getByText(/RSSWise 测试源/)
+  const aiHeading = page.getByRole("heading", { name: "AI 总结" })
+  const body = page.getByText("这是正文内容。")
+
+  await expect(title).toBeVisible()
+  await expect(metadata).toBeVisible()
+  await expect(aiHeading).toBeVisible()
+  await expect(body).toBeVisible()
+
+  const positions = await Promise.all(
+    [title, metadata, aiHeading, body].map(async (locator) => {
+      const box = await locator.boundingBox()
+      expect(box).not.toBeNull()
+      return box!.y
+    }),
+  )
+
+  expect(positions[0]).toBeLessThan(positions[1])
+  expect(positions[1]).toBeLessThan(positions[2])
+  expect(positions[2]).toBeLessThan(positions[3])
 })

@@ -16,7 +16,10 @@ from app.models import (
     Base,
     ExtractionStatus,
     Feed,
+    FeedImportJob,
+    FeedImportSourceType,
     ReadingRecommendation,
+    User,
 )
 from app.tasks import (
     AI_PRIORITY_BACKGROUND,
@@ -24,6 +27,7 @@ from app.tasks import (
     analyze_article_task,
     celery_app,
     extract_article_task,
+    import_feeds_task,
 )
 
 
@@ -264,3 +268,32 @@ def test_analyze_article_persists_result_when_redis_events_fail(
         assert analysis is not None
         assert analysis.analysis_status == AnalysisStatus.success
         assert analysis.ai_blocks is not None
+
+
+def test_import_feeds_task_processes_job(
+    session_local: sessionmaker[Session],
+    monkeypatch: pytest.MonkeyPatch,
+):
+    with session_local() as db:
+        user = User(email="import-task@example.com", password_hash="hash")
+        db.add(user)
+        db.flush()
+        job = FeedImportJob(
+            user_id=user.id,
+            source_type=FeedImportSourceType.urls,
+            total_count=0,
+        )
+        db.add(job)
+        db.commit()
+        job_id = job.id
+
+    calls: list[UUID] = []
+
+    def fake_process(db: Session, received_job_id: UUID) -> None:
+        calls.append(received_job_id)
+
+    monkeypatch.setattr("app.tasks.process_feed_import_job", fake_process)
+
+    import_feeds_task(str(job_id))
+
+    assert calls == [job_id]

@@ -27,6 +27,7 @@ from app.services.analysis_events import (
 from app.services.email_digest_service import run_due_email_digest
 from app.services.extraction_service import fetch_and_extract_markdown
 from app.services.feed_service import refresh_feed_by_id
+from app.services.feed_import_service import process_feed_import_job
 
 celery_app = Celery("rsswise", broker=settings.redis_url, backend=settings.redis_url)
 celery_app.conf.beat_schedule = beat_schedule
@@ -161,7 +162,8 @@ def refresh_feed_task(feed_id: str) -> None:
 
 @celery_app.task(name="feeds.import")
 def import_feeds_task(job_id: str) -> None:
-    return None
+    with SessionLocal() as db:
+        process_feed_import_job(db, UUID(job_id))
 
 
 @celery_app.task(name="email_digest.run_due")

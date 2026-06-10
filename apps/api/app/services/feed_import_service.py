@@ -1,5 +1,7 @@
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from urllib.parse import urlparse
+from uuid import UUID
 from xml.etree import ElementTree
 
 from sqlalchemy import select
@@ -7,10 +9,13 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.models import (
     FeedImportItem,
+    FeedImportItemStatus,
     FeedImportJob,
+    FeedImportJobStatus,
     FeedImportSourceType,
     User,
 )
+from app.services.feed_service import add_or_subscribe_feed_from_url
 
 MAX_FEED_IMPORT_URLS = 200
 
@@ -136,3 +141,79 @@ def get_feed_import_job_for_user(db: Session, user: User, job_id) -> FeedImportJ
     if job is None:
         raise ValueError("import not found")
     return job
+
+
+def now_naive_utc() -> datetime:
+    return datetime.now(UTC).replace(tzinfo=None)
+
+
+def safe_import_error_message(exc: Exception) -> str:
+    if isinstance(exc, ValueError):
+        return str(exc)
+    return "Feed 导入失败"
+
+
+def recompute_job_counts(job: FeedImportJob) -> None:
+    job.processed_count = sum(1 for item in job.items if item.status != FeedImportItemStatus.pending)
+    job.created_count = sum(1 for item in job.items if item.status == FeedImportItemStatus.created)
+    job.subscribed_count = sum(
+        1 for item in job.items if item.status == FeedImportItemStatus.subscribed
+    )
+    job.skipped_count = sum(1 for item in job.items if item.status == FeedImportItemStatus.skipped)
+    job.failed_count = sum(1 for item in job.items if item.status == FeedImportItemStatus.failed)
+
+
+def process_feed_import_job(db: Session, job_id: UUID) -> None:
+    job = db.execute(
+        select(FeedImportJob)
+        .options(selectinload(FeedImportJob.items), selectinload(FeedImportJob.user))
+        .where(FeedImportJob.id == job_id)
+    ).scalar_one()
+
+    job.status = FeedImportJobStatus.processing
+    job.started_at = now_naive_utc()
+    db.commit()
+
+    seen_keys: set[str] = set()
+    try:
+        for item in sorted(job.items, key=lambda import_item: import_item.created_at):
+            if item.status != FeedImportItemStatus.pending:
+                seen_keys.add(item.dedupe_key)
+                continue
+
+            if item.dedupe_key in seen_keys:
+                item.status = FeedImportItemStatus.skipped
+                item.message = "同一批导入中已包含该 Feed"
+                item.processed_at = now_naive_utc()
+            else:
+                seen_keys.add(item.dedupe_key)
+                try:
+                    result = add_or_subscribe_feed_from_url(db, item.normalized_url, job.user)
+                    item.status = FeedImportItemStatus(result.status)
+                    item.feed_id = result.feed.id
+                    if item.status == FeedImportItemStatus.skipped:
+                        item.message = "当前账号已订阅"
+                    elif item.status == FeedImportItemStatus.subscribed:
+                        item.message = "已订阅现有 Feed"
+                    elif item.status == FeedImportItemStatus.created:
+                        item.message = "已新建并订阅 Feed"
+                    item.processed_at = now_naive_utc()
+                except Exception as exc:
+                    item.status = FeedImportItemStatus.failed
+                    item.message = safe_import_error_message(exc)
+                    item.processed_at = now_naive_utc()
+
+            recompute_job_counts(job)
+            db.commit()
+
+        job.status = FeedImportJobStatus.completed
+        job.finished_at = now_naive_utc()
+        recompute_job_counts(job)
+        db.commit()
+    except Exception:
+        job.status = FeedImportJobStatus.failed
+        job.error_message = "导入任务失败"
+        job.finished_at = now_naive_utc()
+        recompute_job_counts(job)
+        db.commit()
+        raise

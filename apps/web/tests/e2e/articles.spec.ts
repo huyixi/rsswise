@@ -509,3 +509,187 @@ test("desktop reader shows title metadata AI block then body", async ({ page }) 
   expect(positions[1]).toBeLessThan(positions[2])
   expect(positions[2]).toBeLessThan(positions[3])
 })
+
+test("desktop sidebar feed click filters articles and toggles back", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await mockAuthenticatedUser(page)
+
+  const feedId = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+  const feedName = "Test Feed"
+  const feedArticleId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+
+  const feedArticleDetail = {
+    id: feedArticleId,
+    title: "Feed 专属文章",
+    source_title: feedName,
+    published_at: "2026-06-04T08:00:00Z",
+    url: "https://example.com/feed-article",
+    one_sentence_summary: "这是 Feed 里的文章",
+    reading_recommendation: "deep_read",
+    reading_reason: null,
+    content_markdown: "这是 Feed 专属文章的正文。",
+    extraction_status: "success",
+    analysis_status: "success",
+    ai_blocks: null,
+  }
+
+  await page.route("**/api/feeds", async (route) => {
+    await route.fulfill({
+      json: [
+        {
+          id: feedId,
+          url: "https://example.com/feed.xml",
+          title: feedName,
+          site_url: null,
+          favicon_url: null,
+          last_fetched_at: null,
+        },
+      ],
+    })
+  })
+
+  await page.route("**/api/articles?**", async (route) => {
+    const url = new URL(route.request().url())
+    const feedIdParam = url.searchParams.get("feed_id")
+    if (feedIdParam === feedId) {
+      await route.fulfill({
+        json: [
+          {
+            id: feedArticleId,
+            title: "Feed 专属文章",
+            source_title: feedName,
+            published_at: "2026-06-04T08:00:00Z",
+            one_sentence_summary: "这是 Feed 里的文章",
+            reading_recommendation: "deep_read",
+            is_read: false,
+          },
+        ],
+      })
+    } else {
+      await route.fulfill({ json: articleList })
+    }
+  })
+
+  await page.route(/\/api\/articles\/[^/]+$/, async (route) => {
+    if (route.request().method() !== "GET") {
+      await route.fallback()
+      return
+    }
+    const articleId = new URL(route.request().url()).pathname.split("/").at(-1)
+    if (articleId === feedArticleId) {
+      await route.fulfill({ json: feedArticleDetail })
+    } else if (articleId === firstArticleId) {
+      await route.fulfill({ json: articleDetail })
+    } else if (articleId === secondArticleId) {
+      await route.fulfill({ json: secondArticleDetail })
+    } else {
+      await route.fallback()
+    }
+  })
+
+  await mockReadRoute(page)
+
+  await page.goto("/articles")
+
+  // Desktop auto-selects first global article
+  await expect(page).toHaveURL(/\/articles\?id=11111111/)
+  await expect(page.getByRole("heading", { name: "移动端文章详情测试" })).toBeVisible()
+
+  // Click feed in sidebar
+  await page.getByRole("button", { name: feedName }).click()
+
+  // URL should contain feed_id
+  await expect(page).toHaveURL(/feed_id=ffffffff/)
+
+  // Middle column shows feed article, not global articles
+  await expect(page.getByRole("button", { name: "Feed 专属文章" })).toBeVisible()
+  await expect(
+    page.getByRole("button", { name: /移动端文章详情测试/ }),
+  ).toHaveCount(0)
+
+  // Desktop auto-selects the feed article in the reader
+  await expect(page.getByRole("heading", { name: "Feed 专属文章" })).toBeVisible()
+
+  // Toggle off — click the same feed again
+  await page.getByRole("button", { name: feedName }).click()
+
+  // URL should no longer contain feed_id
+  await expect(page).not.toHaveURL(/feed_id/)
+
+  // Middle column shows global articles again
+  await expect(
+    page.getByRole("button", { name: /移动端文章详情测试/ }),
+  ).toBeVisible()
+  await expect(page.getByRole("button", { name: "Feed 专属文章" })).toHaveCount(
+    0,
+  )
+})
+
+test("desktop sidebar feed switch preserves view and recommendation filters", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await mockAuthenticatedUser(page)
+
+  const feedId = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+  const feedName = "Test Feed"
+
+  await page.route("**/api/feeds", async (route) => {
+    await route.fulfill({
+      json: [
+        {
+          id: feedId,
+          url: "https://example.com/feed.xml",
+          title: feedName,
+          site_url: null,
+          favicon_url: null,
+          last_fetched_at: null,
+        },
+      ],
+    })
+  })
+
+  await page.route("**/api/articles?**", async (route) => {
+    await route.fulfill({ json: articleList })
+  })
+
+  await page.route(/\/api\/articles\/[^/]+$/, async (route) => {
+    if (route.request().method() !== "GET") {
+      await route.fallback()
+      return
+    }
+    const articleId = new URL(route.request().url()).pathname.split("/").at(-1)
+    if (articleId === firstArticleId) {
+      await route.fulfill({ json: articleDetail })
+    } else if (articleId === secondArticleId) {
+      await route.fulfill({ json: secondArticleDetail })
+    } else {
+      await route.fallback()
+    }
+  })
+
+  await mockReadRoute(page)
+
+  // Apply view and recommendation filters first
+  await page.goto("/articles")
+  await page.getByRole("button", { name: "Unread" }).click()
+  await expect(page).toHaveURL(/\/articles\?view=unread&status=unread/)
+  await page.getByRole("button", { name: "Deep Read" }).click()
+  await expect(page).toHaveURL(
+    /\/articles\?view=unread&status=unread&recommendation=deep_read/,
+  )
+
+  // Click feed — view and recommendation should persist
+  await page.getByRole("button", { name: feedName }).click()
+  await expect(page).toHaveURL(/feed_id=ffffffff/)
+  await expect(page).toHaveURL(/view=unread/)
+  await expect(page).toHaveURL(/recommendation=deep_read/)
+
+  // Toggle off — view and recommendation should still persist
+  await page.getByRole("button", { name: feedName }).click()
+  await expect(page).not.toHaveURL(/feed_id/)
+  await expect(page).toHaveURL(/view=unread/)
+  await expect(page).toHaveURL(/recommendation=deep_read/)
+})

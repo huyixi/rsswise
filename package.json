@@ -1,0 +1,8 @@
+{
+  "name": "rsswise",
+  "private": true,
+  "packageManager": "pnpm@11.3.0",
+  "devDependencies": {
+    "lefthook": "^2.1.9"
+  }
+}

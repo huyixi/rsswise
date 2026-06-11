@@ -132,6 +132,7 @@ def _bullet_items(value: str) -> list[str]:
             continue
         if stripped.startswith(("- ", "* ")):
             item = stripped[2:].strip()
+            item = item.lstrip(">").strip()
             if item:
                 items.append(item)
     return items

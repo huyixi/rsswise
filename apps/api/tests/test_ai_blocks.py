@@ -125,3 +125,17 @@ def test_parse_ai_markdown_rejects_too_many_highlights():
 def test_derive_helpers_return_none_when_blocks_missing():
     assert derive_summary(None) is None
     assert derive_reading_reason([]) is None
+
+
+def test_highlights_strips_blockquote_marker():
+    response = VALID_RESPONSE.replace(
+        "## Highlights\n- 原文中的第一句亮点。\n- 原文中的第二句亮点。\n- 原文中的第三句亮点。\n",
+        "## Highlights\n- > 第一段带引号的摘录。\n- > 第二段带引号的摘录。\n- 第三条没有符号。\n",
+    )
+    result = parse_ai_markdown(response, source_markdown=LONG_MARKDOWN)
+
+    assert result.ai_blocks[1]["content"] == [
+        {"text": "第一段带引号的摘录。", "quote_verified": False},
+        {"text": "第二段带引号的摘录。", "quote_verified": False},
+        {"text": "第三条没有符号。", "quote_verified": False},
+    ]

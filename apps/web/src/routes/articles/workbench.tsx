@@ -195,7 +195,7 @@ function WorkbenchSidebar({
           <DropdownMenuContent align="start" sideOffset={4}>
             <DropdownMenuItem
               closeOnClick
-              onSelect={() => setEmailDialogOpen(true)}
+              onClick={() => setEmailDialogOpen(true)}
             >
               邮件摘要设置
             </DropdownMenuItem>

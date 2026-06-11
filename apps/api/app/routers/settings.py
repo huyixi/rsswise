@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.dependencies.auth import get_current_user
 from app.models import EmailDigestSetting
 from app.schemas import (
     EmailDigestSettingsRead,
@@ -21,7 +22,11 @@ from app.services.email_service import (
     translate_smtp_error,
 )
 
-router = APIRouter(prefix="/settings", tags=["settings"])
+router = APIRouter(
+    prefix="/settings",
+    tags=["settings"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 def serialize_email_digest_setting(setting: EmailDigestSetting) -> EmailDigestSettingsRead:

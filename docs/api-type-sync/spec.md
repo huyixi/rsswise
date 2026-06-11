@@ -49,9 +49,9 @@
 | GET | `/articles/{article_id}/analysis/events` | — | SSE stream | 有 |
 | POST | `/articles/{article_id}/read` | — | 204 | 有 |
 | POST | `/articles/{article_id}/unread` | — | 204 | 有 |
-| GET | `/settings/email-digest` | — | `EmailDigestSettingsRead` (200) | 无 |
-| PUT | `/settings/email-digest` | `EmailDigestSettingsUpdate` | `EmailDigestSettingsRead` (200) | 无 |
-| POST | `/settings/email-digest/test` | — | `EmailDigestTestResponse` (200) | 无 |
+| GET | `/settings/email-digest` | — | `EmailDigestSettingsRead` (200) | 有 |
+| PUT | `/settings/email-digest` | `EmailDigestSettingsUpdate` | `EmailDigestSettingsRead` (200) | 有 |
+| POST | `/settings/email-digest/test` | — | `EmailDigestTestResponse` (200) | 有 |
 | GET | `/health` | — | `{"status":"ok"}` (200) | 无 |
 
 ### 需要后端补齐的响应模型

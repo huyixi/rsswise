@@ -89,7 +89,24 @@ def client() -> Iterator[TestClient]:
     Base.metadata.drop_all(bind=engine)
 
 
-def test_get_email_digest_settings_returns_default(client: TestClient) -> None:
+@pytest.fixture
+def authenticated_client(client: TestClient) -> TestClient:
+    response = client.post(
+        "/auth/register",
+        json={"email": "reader@example.com", "password": "password123"},
+    )
+    assert response.status_code == 201
+    return client
+
+
+def test_email_digest_settings_requires_authentication(client: TestClient) -> None:
+    assert client.get("/settings/email-digest").status_code == 401
+    assert client.put("/settings/email-digest", json={}).status_code == 401
+    assert client.post("/settings/email-digest/test").status_code == 401
+
+
+def test_get_email_digest_settings_returns_default(authenticated_client: TestClient) -> None:
+    client = authenticated_client
     response = client.get("/settings/email-digest")
 
     assert response.status_code == 200
@@ -101,7 +118,8 @@ def test_get_email_digest_settings_returns_default(client: TestClient) -> None:
     assert data["timezone"] == "Asia/Shanghai"
 
 
-def test_put_email_digest_settings_updates_values(client: TestClient) -> None:
+def test_put_email_digest_settings_updates_values(authenticated_client: TestClient) -> None:
+    client = authenticated_client
     response = client.put(
         "/settings/email-digest",
         json={
@@ -121,8 +139,9 @@ def test_put_email_digest_settings_updates_values(client: TestClient) -> None:
 
 
 def test_put_email_digest_settings_rejects_enabled_without_email(
-    client: TestClient,
+    authenticated_client: TestClient,
 ) -> None:
+    client = authenticated_client
     response = client.put(
         "/settings/email-digest",
         json={
@@ -136,7 +155,10 @@ def test_put_email_digest_settings_rejects_enabled_without_email(
     assert response.status_code == 422
 
 
-def test_post_email_digest_test_rejects_missing_recipient(client: TestClient) -> None:
+def test_post_email_digest_test_rejects_missing_recipient(
+    authenticated_client: TestClient,
+) -> None:
+    client = authenticated_client
     response = client.post("/settings/email-digest/test")
 
     assert response.status_code == 400
@@ -144,9 +166,10 @@ def test_post_email_digest_test_rejects_missing_recipient(client: TestClient) ->
 
 
 def test_post_email_digest_test_sends_to_saved_recipient(
-    client: TestClient,
+    authenticated_client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    client = authenticated_client
     client.put(
         "/settings/email-digest",
         json={
@@ -170,8 +193,9 @@ def test_post_email_digest_test_sends_to_saved_recipient(
 
 
 def test_post_email_digest_test_translates_smtp_auth_error(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch
+    authenticated_client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    client = authenticated_client
     client.put(
         "/settings/email-digest",
         json={
@@ -194,8 +218,9 @@ def test_post_email_digest_test_translates_smtp_auth_error(
 
 
 def test_post_email_digest_test_translates_connection_refused(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch
+    authenticated_client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    client = authenticated_client
     client.put(
         "/settings/email-digest",
         json={
@@ -220,8 +245,9 @@ def test_post_email_digest_test_translates_connection_refused(
 
 
 def test_post_email_digest_test_translates_timeout(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch
+    authenticated_client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    client = authenticated_client
     client.put(
         "/settings/email-digest",
         json={
@@ -244,8 +270,9 @@ def test_post_email_digest_test_translates_timeout(
 
 
 def test_post_email_digest_test_translates_smtp_config_error(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch
+    authenticated_client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    client = authenticated_client
     client.put(
         "/settings/email-digest",
         json={

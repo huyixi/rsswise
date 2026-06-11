@@ -83,7 +83,7 @@ function normalizeStatus(value: string | null) {
 
 function navButtonClassName(active: boolean) {
   return cn(
-    "flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left text-sm transition-colors",
+    "flex w-full items-center justify-start gap-2 rounded-md px-2.5 py-2 text-left text-sm transition-colors",
     active
       ? "bg-accent font-medium text-foreground"
       : "text-muted-foreground hover:bg-accent/70 hover:text-foreground",

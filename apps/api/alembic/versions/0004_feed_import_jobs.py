@@ -9,6 +9,7 @@ from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 revision: str = "0004_feed_import_jobs"
 down_revision: str | None = "0003_article_ai_blocks"
@@ -17,31 +18,24 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    source_type = sa.Enum(
-        "opml", "urls", name="feed_import_source_type", create_type=False
+    source_type = postgresql.ENUM(
+        "opml", "urls", name="feed_import_source_type"
     )
-    job_status = sa.Enum(
+    job_status = postgresql.ENUM(
         "pending",
         "processing",
         "completed",
         "failed",
         name="feed_import_job_status",
-        create_type=False,
     )
-    item_status = sa.Enum(
+    item_status = postgresql.ENUM(
         "pending",
         "created",
         "subscribed",
         "skipped",
         "failed",
         name="feed_import_item_status",
-        create_type=False,
     )
-
-    bind = op.get_bind()
-    source_type.create(bind, checkfirst=True)
-    job_status.create(bind, checkfirst=True)
-    item_status.create(bind, checkfirst=True)
 
     op.create_table(
         "feed_import_jobs",

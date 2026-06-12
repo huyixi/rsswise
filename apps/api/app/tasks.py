@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+import hashlib
 from uuid import UUID
 
 from celery import Celery
@@ -10,6 +11,7 @@ from app.db.session import SessionLocal
 from app.models import (
     AnalysisStatus,
     ArticleAIAnalysis,
+    ArticleAIAnalysisLog,
     ArticleContent,
     ExtractionStatus,
     Feed,
@@ -18,7 +20,7 @@ from app.models import (
 from redis.exceptions import RedisError
 
 from app.services.ai_blocks import parse_ai_markdown
-from app.services.ai_service import stream_analyze_markdown_with_deepseek
+from app.services.ai_service import build_ai_messages, stream_analyze_markdown_with_deepseek
 from app.services.analysis_events import (
     get_redis_client,
     reset_analysis_events,
@@ -40,6 +42,19 @@ celery_app.conf.task_queue_max_priority = 10
 celery_app.conf.broker_transport_options = {
     "queue_order_strategy": "priority",
 }
+
+
+def _now() -> datetime:
+    return datetime.now(UTC).replace(tzinfo=None)
+
+
+def _elapsed_ms(started_at: datetime, finished_at: datetime) -> int:
+    return max(0, int((finished_at - started_at).total_seconds() * 1000))
+
+
+def _error_summary(exc: Exception) -> str:
+    message = str(exc) or exc.__class__.__name__
+    return message[:2000]
 
 
 def reset_analysis_event_stream(redis_client, article_id: str) -> None:
@@ -98,7 +113,21 @@ def analyze_article_task(article_id: str) -> None:
             return
 
         analysis.analysis_status = AnalysisStatus.processing
-        analysis.updated_at = datetime.now(UTC).replace(tzinfo=None)
+        analysis.updated_at = _now()
+        markdown = content.content_markdown
+        prompt_messages = build_ai_messages(markdown)
+        started_at = _now()
+        analysis_log = ArticleAIAnalysisLog(
+            article_id=analysis.article_id,
+            model=settings.deepseek_model,
+            input_content_sha256=hashlib.sha256(markdown.encode("utf-8")).hexdigest(),
+            input_content_length=len(markdown),
+            prompt_messages=prompt_messages,
+            status="processing",
+            started_at=started_at,
+            created_at=started_at,
+        )
+        db.add(analysis_log)
         db.commit()
 
         reset_analysis_event_stream(redis_client, article_id)
@@ -111,7 +140,7 @@ def analyze_article_task(article_id: str) -> None:
 
         raw_chunks: list[str] = []
         try:
-            for chunk in stream_analyze_markdown_with_deepseek(content.content_markdown):
+            for chunk in stream_analyze_markdown_with_deepseek(markdown):
                 raw_chunks.append(chunk)
                 publish_analysis_event(
                     redis_client,
@@ -120,11 +149,18 @@ def analyze_article_task(article_id: str) -> None:
                     {"text": chunk},
                 )
 
-            parsed = parse_ai_markdown("".join(raw_chunks), source_markdown=content.content_markdown)
+            raw_output = "".join(raw_chunks)
+            parsed = parse_ai_markdown(raw_output, source_markdown=markdown)
             analysis.ai_blocks = parsed.ai_blocks
             analysis.reading_recommendation = ReadingRecommendation(parsed.reading_recommendation)
             analysis.analysis_status = AnalysisStatus.success
-            analysis.updated_at = datetime.now(UTC).replace(tzinfo=None)
+            analysis.updated_at = _now()
+            finished_at = _now()
+            analysis_log.raw_output = raw_output
+            analysis_log.parsed_output = parsed.ai_blocks
+            analysis_log.status = "success"
+            analysis_log.finished_at = finished_at
+            analysis_log.duration_ms = _elapsed_ms(started_at, finished_at)
             db.commit()
             publish_analysis_event(
                 redis_client,
@@ -132,9 +168,15 @@ def analyze_article_task(article_id: str) -> None:
                 "done",
                 {"article_id": article_id},
             )
-        except Exception:
+        except Exception as exc:
             analysis.analysis_status = AnalysisStatus.failed
-            analysis.updated_at = datetime.now(UTC).replace(tzinfo=None)
+            analysis.updated_at = _now()
+            finished_at = _now()
+            analysis_log.raw_output = "".join(raw_chunks)
+            analysis_log.status = "failed"
+            analysis_log.error_message = _error_summary(exc)
+            analysis_log.finished_at = finished_at
+            analysis_log.duration_ms = _elapsed_ms(started_at, finished_at)
             db.commit()
             publish_analysis_event(
                 redis_client,

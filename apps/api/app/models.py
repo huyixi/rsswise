@@ -119,6 +119,12 @@ class Article(Base):
         uselist=False,
         passive_deletes=True,
     )
+    ai_analysis_logs: Mapped[list["ArticleAIAnalysisLog"]] = relationship(
+        back_populates="article",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="ArticleAIAnalysisLog.created_at",
+    )
 
 
 class ArticleContent(Base):
@@ -164,6 +170,30 @@ class ArticleAIAnalysis(Base):
     )
 
     article: Mapped[Article] = relationship(back_populates="ai_analysis")
+
+
+class ArticleAIAnalysisLog(Base):
+    __tablename__ = "article_ai_analysis_logs"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    article_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("articles.id", ondelete="CASCADE"),
+        index=True,
+    )
+    model: Mapped[str] = mapped_column(String(200))
+    input_content_sha256: Mapped[str] = mapped_column(String(64))
+    input_content_length: Mapped[int] = mapped_column(Integer)
+    prompt_messages: Mapped[list[dict]] = mapped_column(JSON)
+    raw_output: Mapped[str | None] = mapped_column(Text, nullable=True)
+    parsed_output: Mapped[list[dict] | None] = mapped_column(JSON, nullable=True)
+    status: Mapped[str] = mapped_column(String(50), index=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    article: Mapped[Article] = relationship(back_populates="ai_analysis_logs")
 
 
 class EmailDigestSetting(Base):

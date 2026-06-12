@@ -1,10 +1,11 @@
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from uuid import UUID
+import hashlib
 
 import pytest
 from redis.exceptions import RedisError
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -12,6 +13,7 @@ from app.models import (
     AnalysisStatus,
     Article,
     ArticleAIAnalysis,
+    ArticleAIAnalysisLog,
     ArticleContent,
     Base,
     ExtractionStatus,
@@ -189,6 +191,23 @@ def test_analyze_article_streams_chunks_and_persists_final_result(
         assert analysis.reading_recommendation == ReadingRecommendation.skim
         assert analysis.one_sentence_summary is None
         assert analysis.reading_reason is None
+        log = db.execute(select(ArticleAIAnalysisLog)).scalar_one()
+        assert log.article_id == article_id
+        assert log.model == "deepseek-chat"
+        assert log.input_content_sha256 == hashlib.sha256(
+            "# Readable Post\n\nBody text.".encode("utf-8")
+        ).hexdigest()
+        assert log.input_content_length == len("# Readable Post\n\nBody text.")
+        assert log.prompt_messages is not None
+        assert log.prompt_messages[0]["role"] == "system"
+        assert log.prompt_messages[1]["role"] == "user"
+        assert log.raw_output == "".join(VALID_MARKDOWN_CHUNKS)
+        assert log.parsed_output == analysis.ai_blocks
+        assert log.status == "success"
+        assert log.error_message is None
+        assert log.started_at is not None
+        assert log.finished_at is not None
+        assert log.duration_ms is not None
 
 
 def test_analyze_article_marks_failed_when_ai_markdown_is_invalid(
@@ -214,6 +233,15 @@ def test_analyze_article_marks_failed_when_ai_markdown_is_invalid(
         assert analysis is not None
         assert analysis.analysis_status == AnalysisStatus.failed
         assert analysis.ai_blocks is None
+        log = db.execute(select(ArticleAIAnalysisLog)).scalar_one()
+        assert log.article_id == article_id
+        assert log.raw_output == "## 带读问题\n缺少其它字段"
+        assert log.parsed_output is None
+        assert log.status == "failed"
+        assert log.error_message is not None
+        assert "missing required section" in log.error_message
+        assert log.finished_at is not None
+        assert log.duration_ms is not None
 
 
 def test_analyze_article_skips_already_processing_article(

@@ -1,6 +1,7 @@
 from app.models import (
     Article,
     ArticleAIAnalysis,
+    ArticleAIAnalysisLog,
     ArticleContent,
     Feed,
     Session,
@@ -15,6 +16,7 @@ def test_models_match_design_entities():
     assert Article.__tablename__ == "articles"
     assert ArticleContent.__tablename__ == "article_contents"
     assert ArticleAIAnalysis.__tablename__ == "article_ai_analyses"
+    assert ArticleAIAnalysisLog.__tablename__ == "article_ai_analysis_logs"
 
 
 def test_multi_user_tables_are_declared():

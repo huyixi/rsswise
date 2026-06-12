@@ -36,6 +36,34 @@ function aiBlockLabel(block: AiBlock) {
   }
 }
 
+function normalizeQuoteText(value: string) {
+  let text = value.trim()
+  while (text.startsWith(">")) {
+    text = text.slice(1).trim()
+  }
+
+  const quotePairs: Array<[string, string]> = [
+    ['"', '"'],
+    ["'", "'"],
+    ["“", "”"],
+    ["‘", "’"],
+  ]
+
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const [opening, closing] of quotePairs) {
+      if (text.startsWith(opening) && text.endsWith(closing)) {
+        text = text.slice(opening.length, text.length - closing.length).trim()
+        changed = true
+        break
+      }
+    }
+  }
+
+  return text
+}
+
 export function ArticleHeader({
   article,
   className,
@@ -134,13 +162,13 @@ export function ArticleAiSummary({
                   </p>
                 ) : null}
                 {block.type === "highlights" ? (
-                  <ul className="flex list-none flex-col gap-1.5 pl-0">
+                  <ul className="flex list-disc flex-col gap-1.5 pl-5">
                     {block.content.map((item, idx) => (
                       <li
                         key={idx}
-                        className="border-l-2 border-muted-foreground/30 pl-3 text-sm italic text-muted-foreground"
+                        className="text-sm leading-6 text-muted-foreground marker:text-muted-foreground/70"
                       >
-                        {item.text}
+                        {normalizeQuoteText(item.text)}
                       </li>
                     ))}
                   </ul>
@@ -156,16 +184,16 @@ export function ArticleAiSummary({
                   </p>
                 ) : null}
                 {block.type === "chapters" ? (
-                  <ul className="flex list-none flex-wrap gap-1.5 pl-0">
+                  <ol className="flex list-decimal flex-col gap-1 pl-5">
                     {block.content.map((item, idx) => (
                       <li
                         key={idx}
-                        className="rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+                        className="text-sm leading-6 text-muted-foreground marker:text-muted-foreground/70"
                       >
                         {item.title}
                       </li>
                     ))}
-                  </ul>
+                  </ol>
                 ) : null}
               </section>
             ))

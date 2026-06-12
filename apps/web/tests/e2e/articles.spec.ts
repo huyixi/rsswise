@@ -79,9 +79,18 @@ const articleDetail = {
       type: "highlights" as const,
       title: "Highlights" as const,
       content: [
-        { text: "原文第一句亮点。", quote_verified: false },
-        { text: "原文第二句亮点。", quote_verified: false },
-        { text: "原文第三句亮点。", quote_verified: false },
+        {
+          text: "\"Agents are becoming capable of doing more of the work involved in building software, but they’re still mostly individual productivity tools, useful to one person at a time.\"",
+          quote_verified: false,
+        },
+        {
+          text: "\"Coding sessions let Linear Agent natively move directly from an issue to implementation.\"",
+          quote_verified: false,
+        },
+        {
+          text: "\"Diffs provides a native way to understand code changes and review pull requests in Linear.\"",
+          quote_verified: false,
+        },
       ],
       order: 20,
     },
@@ -94,7 +103,10 @@ const articleDetail = {
     {
       type: "chapters" as const,
       title: "章节" as const,
-      content: [] as Array<{ title: string }>,
+      content: [
+        { title: "Agent 协作模式" },
+        { title: "代码审查体验" },
+      ],
       order: 50,
     },
   ],
@@ -241,14 +253,15 @@ test("mobile article list opens standalone detail page", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "移动端文章详情测试" })).toBeVisible()
   await expect(page.getByRole("heading", { name: "AI 总结" })).toBeVisible()
   await expect(page.getByText("这篇文章要回答什么问题？")).toBeVisible()
-  await expect(page.getByText("原文第一句亮点。")).toBeVisible()
   await expect(page.getByText("来自 block 的一句话摘要")).toBeVisible()
   await expect(page.getByText("来自 block 的阅读理由。")).toBeVisible()
+  await expect(page.getByText("Agent 协作模式")).toBeVisible()
   await expect(page.getByText("这是正文内容。")).toBeVisible()
   await expect(page.getByRole("heading", { name: "带读问题" })).toBeVisible()
   await expect(page.getByRole("heading", { name: "摘录" })).toBeVisible()
   await expect(page.getByRole("heading", { name: "一句话摘要" })).toBeVisible()
   await expect(page.getByRole("heading", { name: "阅读理由" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "章节" })).toBeVisible()
   expect(readRequestCount).toBe(1)
 })
 
@@ -264,6 +277,24 @@ test("mobile detail shows AI summary before article body", async ({ page }) => {
   const bodyContent = page.getByText("这是正文内容。")
   await expect(aiBox).toBeVisible()
   await expect(bodyContent).toBeVisible()
+  await expect(
+    page.getByText(
+      "Agents are becoming capable of doing more of the work involved in building software, but they’re still mostly individual productivity tools, useful to one person at a time.",
+    ),
+  ).toBeVisible()
+  await expect(page.getByText("\"Agents are becoming")).toHaveCount(0)
+  await expect(
+    page
+      .getByRole("heading", { name: "摘录" })
+      .locator("xpath=..")
+      .locator("ul li"),
+  ).toHaveCount(3)
+  await expect(
+    page
+      .getByRole("heading", { name: "章节" })
+      .locator("xpath=..")
+      .locator("ol li"),
+  ).toHaveCount(2)
 
   const aiBoxTop = await aiBox.evaluate((node) => node.getBoundingClientRect().top)
   const bodyTop = await bodyContent.evaluate((node) =>
@@ -305,18 +336,22 @@ test("mobile detail renders blocks in order", async ({ page }) => {
   const questionTop = await page.getByText("这篇文章要回答什么问题？").evaluate(
     (node) => node.getBoundingClientRect().top,
   )
-  const highlightTop = await page.getByText("原文第一句亮点。").evaluate(
-    (node) => node.getBoundingClientRect().top,
-  )
+  const highlightTop = await page
+    .getByText("Agents are becoming capable of doing more")
+    .evaluate((node) => node.getBoundingClientRect().top)
   const summaryTop = await page.getByText("来自 block 的一句话摘要").evaluate(
     (node) => node.getBoundingClientRect().top,
   )
   const reasonTop = await page.getByText("来自 block 的阅读理由。").evaluate(
     (node) => node.getBoundingClientRect().top,
   )
+  const chaptersTop = await page
+    .getByText("Agent 协作模式")
+    .evaluate((node) => node.getBoundingClientRect().top)
   expect(questionTop).toBeLessThan(highlightTop)
   expect(highlightTop).toBeLessThan(summaryTop)
   expect(summaryTop).toBeLessThan(reasonTop)
+  expect(reasonTop).toBeLessThan(chaptersTop)
 })
 
 test("desktop article detail route redirects to workbench selection", async ({ page }) => {

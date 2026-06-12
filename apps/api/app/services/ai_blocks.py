@@ -41,7 +41,10 @@ def parse_ai_markdown(markdown: str, *, source_markdown: str) -> ParsedAiMarkdow
         raise AiBlockParseError(f"missing required section: {', '.join(missing)}")
 
     reading_question = _single_text(sections["带读问题"], "reading question")
-    highlights = _bullet_items(sections["Highlights"])
+    highlights = [
+        _normalize_quote_text(item)
+        for item in _bullet_items(sections["Highlights"])
+    ]
     if len(highlights) < 3 or len(highlights) > 5:
         raise AiBlockParseError("highlights must contain 3-5 items")
 
@@ -136,6 +139,23 @@ def _bullet_items(value: str) -> list[str]:
             if item:
                 items.append(item)
     return items
+
+
+def _normalize_quote_text(value: str) -> str:
+    text = value.strip()
+    while text.startswith(">"):
+        text = text[1:].strip()
+
+    quote_pairs = [('"', '"'), ("'", "'"), ("“", "”"), ("‘", "’")]
+    changed = True
+    while changed:
+        changed = False
+        for opening, closing in quote_pairs:
+            if text.startswith(opening) and text.endswith(closing) and len(text) >= 2:
+                text = text[len(opening) : len(text) - len(closing)].strip()
+                changed = True
+                break
+    return text
 
 
 def _derive_text_block(ai_blocks: list[AiBlock] | None, block_type: str) -> str | None:

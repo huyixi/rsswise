@@ -139,3 +139,21 @@ def test_highlights_strips_blockquote_marker():
         {"text": "第二段带引号的摘录。", "quote_verified": False},
         {"text": "第三条没有符号。", "quote_verified": False},
     ]
+
+
+def test_highlights_strips_outer_quote_wrappers():
+    response = VALID_RESPONSE.replace(
+        "## Highlights\n- 原文中的第一句亮点。\n- 原文中的第二句亮点。\n- 原文中的第三句亮点。\n",
+        (
+            '## Highlights\n- "Agents are becoming capable of doing more."\n'
+            "- “Coding sessions move from issue to implementation.”\n"
+            "- > 'Diffs provides a native way to understand code changes.'\n"
+        ),
+    )
+    result = parse_ai_markdown(response, source_markdown=LONG_MARKDOWN)
+
+    assert result.ai_blocks[1]["content"] == [
+        {"text": "Agents are becoming capable of doing more.", "quote_verified": False},
+        {"text": "Coding sessions move from issue to implementation.", "quote_verified": False},
+        {"text": "Diffs provides a native way to understand code changes.", "quote_verified": False},
+    ]

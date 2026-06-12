@@ -183,22 +183,22 @@ def test_list_articles_derives_summary_from_ai_blocks(client: TestClient):
     user = register(client)
     ai_blocks = [
         {
-            "type": "reading_question",
-            "title": "带读问题",
-            "content": "这篇文章要回答什么？",
-            "order": 10,
-        },
-        {
             "type": "summary",
             "title": "一句话摘要",
             "content": "来自 block 的摘要。",
-            "order": 30,
+            "order": 10,
+        },
+        {
+            "type": "reading_question",
+            "title": "带读问题",
+            "content": "这篇文章要回答什么？",
+            "order": 20,
         },
         {
             "type": "reading_reason",
             "title": "阅读理由",
             "content": "来自 block 的理由。",
-            "order": 40,
+            "order": 30,
         },
     ]
     article_id = seed_article(client, user_id=user["id"], is_read=False, ai_blocks=ai_blocks)
@@ -208,7 +208,7 @@ def test_list_articles_derives_summary_from_ai_blocks(client: TestClient):
     assert unread_articles[0]["one_sentence_summary"] == "来自 block 的摘要。"
 
     detail = client.get(f"/articles/{article_id}").json()
-    assert detail["ai_blocks"][0]["type"] == "reading_question"
+    assert detail["ai_blocks"][0]["type"] == "summary"
     assert detail["one_sentence_summary"] == "来自 block 的摘要。"
     assert detail["reading_reason"] == "来自 block 的理由。"
 

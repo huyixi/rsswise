@@ -51,27 +51,31 @@ def test_parse_ai_markdown_builds_ordered_blocks():
 
     assert result.reading_recommendation == "deep_read"
     assert [block["type"] for block in result.ai_blocks] == [
-        "reading_question",
-        "highlights",
         "summary",
+        "reading_question",
         "reading_reason",
+        "highlights",
         "chapters",
     ]
     assert result.ai_blocks[0] == {
+        "type": "summary",
+        "title": "一句话摘要",
+        "content": "文章解释了 AI 产品在体验、成本和可靠性之间的权衡。",
+        "order": 10,
+    }
+    assert result.ai_blocks[1] == {
         "type": "reading_question",
         "title": "带读问题",
         "content": "这篇文章要回答 AI 产品如何在成本和体验之间取舍？",
-        "order": 10,
+        "order": 20,
     }
-    assert result.ai_blocks[1]["content"] == [
+    assert result.ai_blocks[2]["content"] == (
+        "它能帮助读者判断类似产品决策背后的真实约束。"
+    )
+    assert result.ai_blocks[3]["content"] == [
         {"text": "原文中的第一句亮点。", "quote_verified": False},
         {"text": "原文中的第二句亮点。", "quote_verified": False},
         {"text": "原文中的第三句亮点。", "quote_verified": False},
-    ]
-    assert result.ai_blocks[-1]["content"] == [
-        {"title": "背景变化"},
-        {"title": "产品取舍"},
-        {"title": "未来影响"},
     ]
     assert derive_summary(result.ai_blocks) == (
         "文章解释了 AI 产品在体验、成本和可靠性之间的权衡。"
@@ -79,6 +83,11 @@ def test_parse_ai_markdown_builds_ordered_blocks():
     assert derive_reading_reason(result.ai_blocks) == (
         "它能帮助读者判断类似产品决策背后的真实约束。"
     )
+    assert result.ai_blocks[-1]["content"] == [
+        {"title": "背景变化"},
+        {"title": "产品取舍"},
+        {"title": "未来影响"},
+    ]
 
 
 def test_parse_ai_markdown_discards_chapters_for_short_article():
@@ -134,7 +143,7 @@ def test_highlights_strips_blockquote_marker():
     )
     result = parse_ai_markdown(response, source_markdown=LONG_MARKDOWN)
 
-    assert result.ai_blocks[1]["content"] == [
+    assert result.ai_blocks[3]["content"] == [
         {"text": "第一段带引号的摘录。", "quote_verified": False},
         {"text": "第二段带引号的摘录。", "quote_verified": False},
         {"text": "第三条没有符号。", "quote_verified": False},
@@ -152,7 +161,7 @@ def test_highlights_strips_outer_quote_wrappers():
     )
     result = parse_ai_markdown(response, source_markdown=LONG_MARKDOWN)
 
-    assert result.ai_blocks[1]["content"] == [
+    assert result.ai_blocks[3]["content"] == [
         {"text": "Agents are becoming capable of doing more.", "quote_verified": False},
         {"text": "Coding sessions move from issue to implementation.", "quote_verified": False},
         {"text": "Diffs provides a native way to understand code changes.", "quote_verified": False},

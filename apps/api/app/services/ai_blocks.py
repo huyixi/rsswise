@@ -56,10 +56,22 @@ def parse_ai_markdown(markdown: str, *, source_markdown: str) -> ParsedAiMarkdow
 
     blocks: list[AiBlock] = [
         {
+            "type": "summary",
+            "title": "一句话摘要",
+            "content": summary,
+            "order": 10,
+        },
+        {
             "type": "reading_question",
             "title": "带读问题",
             "content": reading_question,
-            "order": 10,
+            "order": 20,
+        },
+        {
+            "type": "reading_reason",
+            "title": "阅读理由",
+            "content": reading_reason,
+            "order": 30,
         },
         {
             "type": "highlights",
@@ -68,18 +80,6 @@ def parse_ai_markdown(markdown: str, *, source_markdown: str) -> ParsedAiMarkdow
                 {"text": item, "quote_verified": False}
                 for item in highlights
             ],
-            "order": 20,
-        },
-        {
-            "type": "summary",
-            "title": "一句话摘要",
-            "content": summary,
-            "order": 30,
-        },
-        {
-            "type": "reading_reason",
-            "title": "阅读理由",
-            "content": reading_reason,
             "order": 40,
         },
     ]

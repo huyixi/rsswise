@@ -183,10 +183,10 @@ def test_analyze_article_streams_chunks_and_persists_final_result(
         assert analysis.analysis_status == AnalysisStatus.success
         assert analysis.ai_blocks is not None
         assert [block["type"] for block in analysis.ai_blocks] == [
-            "reading_question",
-            "highlights",
             "summary",
+            "reading_question",
             "reading_reason",
+            "highlights",
         ]
         assert analysis.reading_recommendation == ReadingRecommendation.skim
         assert analysis.one_sentence_summary is None

@@ -67,13 +67,19 @@ const articleDetail = {
       type: "summary" as const,
       title: "一句话摘要" as const,
       content: "来自 block 的一句话摘要",
-      order: 30,
+      order: 10,
     },
     {
       type: "reading_question" as const,
       title: "带读问题" as const,
       content: "这篇文章要回答什么问题？",
-      order: 10,
+      order: 20,
+    },
+    {
+      type: "reading_reason" as const,
+      title: "阅读理由" as const,
+      content: "来自 block 的阅读理由。",
+      order: 30,
     },
     {
       type: "highlights" as const,
@@ -92,12 +98,6 @@ const articleDetail = {
           quote_verified: false,
         },
       ],
-      order: 20,
-    },
-    {
-      type: "reading_reason" as const,
-      title: "阅读理由" as const,
-      content: "来自 block 的阅读理由。",
       order: 40,
     },
     {
@@ -333,25 +333,25 @@ test("mobile detail renders blocks in order", async ({ page }) => {
 
   await page.goto("/articles/11111111-1111-1111-1111-111111111111")
 
-  const questionTop = await page.getByText("这篇文章要回答什么问题？").evaluate(
+  const summaryTop = await page.getByText("来自 block 的一句话摘要").evaluate(
     (node) => node.getBoundingClientRect().top,
   )
-  const highlightTop = await page
-    .getByText("Agents are becoming capable of doing more")
-    .evaluate((node) => node.getBoundingClientRect().top)
-  const summaryTop = await page.getByText("来自 block 的一句话摘要").evaluate(
+  const questionTop = await page.getByText("这篇文章要回答什么问题？").evaluate(
     (node) => node.getBoundingClientRect().top,
   )
   const reasonTop = await page.getByText("来自 block 的阅读理由。").evaluate(
     (node) => node.getBoundingClientRect().top,
   )
+  const highlightTop = await page
+    .getByText("Agents are becoming capable of doing more")
+    .evaluate((node) => node.getBoundingClientRect().top)
   const chaptersTop = await page
     .getByText("Agent 协作模式")
     .evaluate((node) => node.getBoundingClientRect().top)
-  expect(questionTop).toBeLessThan(highlightTop)
-  expect(highlightTop).toBeLessThan(summaryTop)
-  expect(summaryTop).toBeLessThan(reasonTop)
-  expect(reasonTop).toBeLessThan(chaptersTop)
+  expect(summaryTop).toBeLessThan(questionTop)
+  expect(questionTop).toBeLessThan(reasonTop)
+  expect(reasonTop).toBeLessThan(highlightTop)
+  expect(highlightTop).toBeLessThan(chaptersTop)
 })
 
 test("desktop article detail route redirects to workbench selection", async ({ page }) => {

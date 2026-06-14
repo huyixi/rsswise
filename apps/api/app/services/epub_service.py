@@ -6,10 +6,17 @@ from textwrap import dedent
 from uuid import NAMESPACE_URL, uuid5
 from zipfile import ZIP_DEFLATED, ZIP_STORED, ZipFile, ZipInfo
 
+import httpx
+from PIL import Image as PILImage
+
 from app.models import Article
 from app.services.ai_blocks import derive_reading_reason, derive_summary
 
 ZIP_TIMESTAMP = (1980, 1, 1, 0, 0, 0)
+COVER_MAX_W = 800
+COVER_MAX_H = 1200
+COVER_JPEG_Q = 85
+COVER_TIMEOUT = 10.0
 
 
 def markdown_to_xhtml(markdown: str | None) -> str:
@@ -71,8 +78,73 @@ def _write_file(
     archive.writestr(info, content)
 
 
+def _first_cover_url(articles: list[Article]) -> str | None:
+    for article in articles:
+        if article.cover_image_url:
+            return article.cover_image_url
+    return None
+
+
+def _download_cover(url: str) -> bytes | None:
+    try:
+        response = httpx.get(url, timeout=COVER_TIMEOUT, follow_redirects=True)
+        response.raise_for_status()
+    except Exception:
+        return None
+
+    try:
+        img = PILImage.open(BytesIO(response.content))
+        img = img.convert("RGB")
+        img.thumbnail((COVER_MAX_W, COVER_MAX_H), PILImage.LANCZOS)
+        buf = BytesIO()
+        img.save(buf, format="JPEG", quality=COVER_JPEG_Q)
+        return buf.getvalue()
+    except Exception:
+        return None
+
+
+def _cover_page_xhtml(digest_date: str, *, has_image: bool) -> str:
+    image_html = (
+        '<div class="cover-image"><img src="cover.jpeg" alt="封面" /></div>'
+        if has_image
+        else ""
+    )
+    return dedent(f"""\
+        <?xml version="1.0" encoding="utf-8"?>
+        <!DOCTYPE html>
+        <html xmlns="http://www.w3.org/1999/xhtml" lang="zh-CN">
+          <head>
+            <title>RSSWise Digest - {digest_date}</title>
+            <meta charset="utf-8" />
+            <style>
+              body {{ margin: 2em; font-family: serif; }}
+              .brand {{ font-size: 1.5em; font-weight: bold; }}
+              .date {{ font-size: 0.9em; color: #555; margin-top: 0.5em; }}
+              .cover-image {{ text-align: center; margin-top: 2em; }}
+              .cover-image img {{ max-width: 100%; max-height: 80vh; object-fit: contain; }}
+            </style>
+          </head>
+          <body>
+            <div class="brand">RSSWISE</div>
+            <div class="date">{digest_date}</div>
+            {image_html}
+          </body>
+        </html>
+        """)
+
+
 def build_digest_epub(articles: list[Article], *, digest_date: str) -> bytes:
     identifier = _stable_identifier(articles, digest_date)
+
+    cover_url = _first_cover_url(articles)
+    cover_bytes = _download_cover(cover_url) if cover_url else None
+    has_cover_image = cover_bytes is not None
+
+    cover_image_manifest = (
+        '<item id="cover-image" href="cover.jpeg" media-type="image/jpeg" properties="cover-image" />'
+        if has_cover_image
+        else ""
+    )
     chapter_items = "\n".join(
         (
             f'<item id="article-{index:03d}" '
@@ -101,10 +173,13 @@ def build_digest_epub(articles: list[Article], *, digest_date: str) -> bytes:
             <dc:creator>RSSWise</dc:creator>
           </metadata>
           <manifest>
+            <item id="cover-page" href="cover.xhtml" media-type="application/xhtml+xml" />
+            {cover_image_manifest}
             <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav" />
             {chapter_items}
           </manifest>
           <spine>
+            <itemref idref="cover-page" />
             {spine_items}
           </spine>
         </package>
@@ -157,6 +232,19 @@ def build_digest_epub(articles: list[Article], *, digest_date: str) -> bytes:
             compress_type=ZIP_DEFLATED,
         )
         _write_file(archive, "OEBPS/content.opf", content_opf, compress_type=ZIP_DEFLATED)
+        _write_file(
+            archive,
+            "OEBPS/cover.xhtml",
+            _cover_page_xhtml(digest_date, has_image=has_cover_image),
+            compress_type=ZIP_DEFLATED,
+        )
+        if has_cover_image:
+            _write_file(
+                archive,
+                "OEBPS/cover.jpeg",
+                cover_bytes,
+                compress_type=ZIP_DEFLATED,
+            )
         _write_file(archive, "OEBPS/nav.xhtml", nav_xhtml, compress_type=ZIP_DEFLATED)
         _write_file(archive, "OEBPS/toc.ncx", toc_ncx, compress_type=ZIP_DEFLATED)
         for index, article in enumerate(articles, start=1):

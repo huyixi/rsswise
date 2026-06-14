@@ -147,9 +147,8 @@ def _normalize_quote_text(value: str) -> str:
     while text.startswith(">"):
         text = text[1:].strip()
 
-    text = BRACKET_NUM_RE.sub("", text)
     while BRACKET_NUM_RE.match(text):
-        text = BRACKET_NUM_RE.sub("", text)
+        text = BRACKET_NUM_RE.sub("", text, count=1)
 
     quote_pairs = [('"', '"'), ("'", "'"), ("“", "”"), ("‘", "’")]
     changed = True

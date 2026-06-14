@@ -201,7 +201,7 @@ function WorkbenchSidebar({
             </DropdownMenuItem>
             <DropdownMenuItem
               closeOnClick
-              onSelect={onLogout}
+              onClick={onLogout}
               disabled={isLoggingOut}
             >
               退出登录

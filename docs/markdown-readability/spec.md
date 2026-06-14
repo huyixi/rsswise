@@ -21,7 +21,7 @@ The implementation should keep RSSWise's restrained, tool-like interface. The ar
 - Do not add syntax highlighting, copy-code buttons, image lightboxes, collapsible sections, or complex cards.
 - Heading stripping should become explicit:
   - Article body may strip the first leading heading to avoid duplicating the page title.
-  - AI streaming Markdown must preserve headings such as `## 带读问题` and `## Highlights`.
+  - AI streaming Markdown must preserve headings such as `## 问题` and `## Highlights`.
 
 ## Current State
 
@@ -116,7 +116,7 @@ Final AI blocks should keep the existing sorted order:
 
 Each block should get a lightweight label:
 
-- `带读问题`
+- `问题`
 - `摘录`
 - `一句话摘要`
 - `阅读理由`

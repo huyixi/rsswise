@@ -131,11 +131,11 @@ def test_extract_article_queues_background_ai_priority(
 
 
 VALID_MARKDOWN_CHUNKS = [
-    "## 带读问题\n这篇文章要回答什么？\n\n",
-    "## Highlights\n- 原文第一句。\n- 原文第二句。\n- 原文第三句。\n\n",
+    "## 问题\n这篇文章要回答什么？\n\n",
     "## 一句话摘要\n这是一句话摘要。\n\n",
-    "## 阅读建议\nskim\n\n",
     "## 阅读理由\n这篇文章适合快速了解背景。\n",
+    "## 阅读建议\nskim\n\n",
+    "## Highlights\n- 原文第一句。\n- 原文第二句。\n- 原文第三句。\n\n",
 ]
 
 
@@ -169,11 +169,11 @@ def test_analyze_article_streams_chunks_and_persists_final_result(
     assert writes == [
         ("reset", str(article_id), None),
         ("started", str(article_id), {"article_id": str(article_id)}),
-        ("chunk", str(article_id), {"text": "## 带读问题\n这篇文章要回答什么？\n\n"}),
-        ("chunk", str(article_id), {"text": "## Highlights\n- 原文第一句。\n- 原文第二句。\n- 原文第三句。\n\n"}),
+        ("chunk", str(article_id), {"text": "## 问题\n这篇文章要回答什么？\n\n"}),
         ("chunk", str(article_id), {"text": "## 一句话摘要\n这是一句话摘要。\n\n"}),
-        ("chunk", str(article_id), {"text": "## 阅读建议\nskim\n\n"}),
         ("chunk", str(article_id), {"text": "## 阅读理由\n这篇文章适合快速了解背景。\n"}),
+        ("chunk", str(article_id), {"text": "## 阅读建议\nskim\n\n"}),
+        ("chunk", str(article_id), {"text": "## Highlights\n- 原文第一句。\n- 原文第二句。\n- 原文第三句。\n\n"}),
         ("done", str(article_id), {"article_id": str(article_id)}),
     ]
 
@@ -183,8 +183,8 @@ def test_analyze_article_streams_chunks_and_persists_final_result(
         assert analysis.analysis_status == AnalysisStatus.success
         assert analysis.ai_blocks is not None
         assert [block["type"] for block in analysis.ai_blocks] == [
-            "summary",
             "reading_question",
+            "summary",
             "reading_reason",
             "highlights",
         ]
@@ -222,7 +222,7 @@ def test_analyze_article_marks_failed_when_ai_markdown_is_invalid(
     monkeypatch.setattr("app.tasks.write_analysis_event", lambda client, article_id, event_type, payload: None)
     monkeypatch.setattr(
         "app.tasks.stream_analyze_markdown_with_deepseek",
-        lambda markdown: iter(["## 带读问题\n缺少其它字段"]),
+        lambda markdown: iter(["## 问题\n缺少其它字段"]),
     )
 
     with pytest.raises(Exception):
@@ -235,7 +235,7 @@ def test_analyze_article_marks_failed_when_ai_markdown_is_invalid(
         assert analysis.ai_blocks is None
         log = db.execute(select(ArticleAIAnalysisLog)).scalar_one()
         assert log.article_id == article_id
-        assert log.raw_output == "## 带读问题\n缺少其它字段"
+        assert log.raw_output == "## 问题\n缺少其它字段"
         assert log.parsed_output is None
         assert log.status == "failed"
         assert log.error_message is not None

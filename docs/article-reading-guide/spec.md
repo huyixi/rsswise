@@ -40,7 +40,7 @@ The canonical detail AI content is an ordered array named `ai_blocks`.
 type AiBlock =
   | {
       type: "reading_question"
-      title: "带读问题"
+      title: "问题"
       content: string
       order: number
     }
@@ -162,7 +162,7 @@ The AI service should stream Markdown, not JSON, so users can read useful progre
 The generated Markdown must use fixed section headings:
 
 ```markdown
-## 带读问题
+## 问题
 ...
 
 ## Highlights
@@ -203,8 +203,8 @@ The parser should be deterministic and independent from the OpenAI client.
 
 Validation rules:
 
-- Required sections must be present: `带读问题`, `Highlights`, `一句话摘要`, `阅读建议`, `阅读理由`.
-- `带读问题` content must be non-empty.
+- Required sections must be present: `问题`, `Highlights`, `一句话摘要`, `阅读建议`, `阅读理由`.
+- `问题` content must be non-empty.
 - `Highlights` must contain 3-5 bullet items.
 - Each highlight item must create `{ text, quote_verified: false }`.
 - `一句话摘要` content must be non-empty.
@@ -220,7 +220,7 @@ Recommended resulting blocks:
 [
   {
     "type": "reading_question",
-    "title": "带读问题",
+    "title": "问题",
     "content": "这篇文章试图回答什么问题？",
     "order": 10
   },

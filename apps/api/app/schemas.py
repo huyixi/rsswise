@@ -26,7 +26,7 @@ class ChapterBlockItem(BaseModel):
 
 class ReadingQuestionBlock(BaseModel):
     type: Literal["reading_question"]
-    title: Literal["带读问题"]
+    title: Literal["问题"]
     content: str
     order: int
 

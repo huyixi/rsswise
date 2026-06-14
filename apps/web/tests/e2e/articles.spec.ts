@@ -71,7 +71,7 @@ const articleDetail = {
     },
     {
       type: "reading_question" as const,
-      title: "带读问题" as const,
+      title: "问题" as const,
       content: "这篇文章要回答什么问题？",
       order: 20,
     },
@@ -208,7 +208,7 @@ async function mockAnalysisStreamRoute(page: Page) {
           `data: {"article_id":"${streamingArticleId}"}\n\n` +
           `id: 2-0\n` +
           `event: chunk\n` +
-          `data: {"text":"## 带读问题\\n这篇文章正在生成什么问题？\\n\\n"}\n\n`,
+          `data: {"text":"## 问题\\n这篇文章正在生成什么问题？\\n\\n"}\n\n`,
       })
     },
   )
@@ -257,7 +257,7 @@ test("mobile article list opens standalone detail page", async ({ page }) => {
   await expect(page.getByText("来自 block 的阅读理由。")).toBeVisible()
   await expect(page.getByText("Agent 协作模式")).toBeVisible()
   await expect(page.getByText("这是正文内容。")).toBeVisible()
-  await expect(page.getByRole("heading", { name: "带读问题" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "问题" })).toBeVisible()
   await expect(page.getByRole("heading", { name: "摘录" })).toBeVisible()
   await expect(page.getByRole("heading", { name: "一句话摘要" })).toBeVisible()
   await expect(page.getByRole("heading", { name: "阅读理由" })).toBeVisible()
@@ -442,7 +442,7 @@ test("desktop workbench shows streaming AI summary text", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "流式 AI 摘要测试" })).toBeVisible()
   await expect(page.getByRole("heading", { name: "AI 总结" })).toBeVisible()
   await expect(page.getByText("这篇文章正在生成什么问题？")).toBeVisible()
-  await expect(page.getByRole("heading", { name: "带读问题" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "问题" })).toBeVisible()
   await expect(page.getByText("重新 AI 分析")).toHaveCount(0)
 })
 
@@ -458,7 +458,7 @@ test("mobile detail shows streaming AI summary text", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "流式 AI 摘要测试" })).toBeVisible()
   await expect(page.getByRole("heading", { name: "AI 总结" })).toBeVisible()
   await expect(page.getByText("这篇文章正在生成什么问题？")).toBeVisible()
-  await expect(page.getByRole("heading", { name: "带读问题" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "问题" })).toBeVisible()
   await expect(page.getByText("重新 AI 分析")).toHaveCount(0)
 })
 

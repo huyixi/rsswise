@@ -11,7 +11,7 @@ export type ReadingRecommendation = "deep_read" | "skim" | "skip";
 export type AiBlock =
   | {
       type: "reading_question"
-      title: "带读问题"
+      title: "问题"
       content: string
       order: number
     }

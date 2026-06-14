@@ -22,7 +22,7 @@ LONG_MARKDOWN = "\n\n".join(
 )
 
 
-VALID_RESPONSE = """## 带读问题
+VALID_RESPONSE = """## 问题
 这篇文章要回答 AI 产品如何在成本和体验之间取舍？
 
 ## Highlights
@@ -51,22 +51,22 @@ def test_parse_ai_markdown_builds_ordered_blocks():
 
     assert result.reading_recommendation == "deep_read"
     assert [block["type"] for block in result.ai_blocks] == [
-        "summary",
         "reading_question",
+        "summary",
         "reading_reason",
         "highlights",
         "chapters",
     ]
     assert result.ai_blocks[0] == {
-        "type": "summary",
-        "title": "一句话摘要",
-        "content": "文章解释了 AI 产品在体验、成本和可靠性之间的权衡。",
+        "type": "reading_question",
+        "title": "问题",
+        "content": "这篇文章要回答 AI 产品如何在成本和体验之间取舍？",
         "order": 10,
     }
     assert result.ai_blocks[1] == {
-        "type": "reading_question",
-        "title": "带读问题",
-        "content": "这篇文章要回答 AI 产品如何在成本和体验之间取舍？",
+        "type": "summary",
+        "title": "一句话摘要",
+        "content": "文章解释了 AI 产品在体验、成本和可靠性之间的权衡。",
         "order": 20,
     }
     assert result.ai_blocks[2]["content"] == (

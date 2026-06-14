@@ -24,7 +24,7 @@ function visibleAiBlocks(blocks: AiBlock[] | null) {
 function aiBlockLabel(block: AiBlock) {
   switch (block.type) {
     case "reading_question":
-      return "带读问题"
+      return "问题"
     case "highlights":
       return "摘录"
     case "summary":

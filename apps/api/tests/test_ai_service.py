@@ -45,7 +45,7 @@ class FakeCompletions:
     def create(self, **kwargs):
         self.kwargs = kwargs
         return [
-            FakeChunk("## 带读问题\n"),
+            FakeChunk("## 问题\n"),
             FakeChunk(None),
             FakeChunk("这篇文章要回答什么？\n"),
         ]
@@ -72,13 +72,13 @@ def test_stream_analyze_markdown_yields_delta_content(monkeypatch: pytest.Monkey
     chunks = list(stream_analyze_markdown_with_deepseek("# Title"))
 
     assert chunks == [
-        "## 带读问题\n",
+        "## 问题\n",
         "这篇文章要回答什么？\n",
     ]
     assert fake_client.chat.completions.kwargs is not None
     assert fake_client.chat.completions.kwargs["stream"] is True
     assert "response_format" not in fake_client.chat.completions.kwargs
     messages = fake_client.chat.completions.kwargs["messages"]
-    assert "## 带读问题" in messages[0]["content"]
+    assert "## 问题" in messages[0]["content"]
     assert "## Highlights" in messages[0]["content"]
     assert "逐字摘录" in messages[0]["content"]

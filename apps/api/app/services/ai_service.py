@@ -28,8 +28,8 @@ def build_ai_messages(markdown: str) -> list[dict[str, str]]:
             "role": "system",
             "content": (
                 "你是 RSS 阅读前分析助手。请只输出 Markdown，不要输出 JSON。"
-                "必须按顺序输出以下二级标题：## 一句话摘要、## 带读问题、## 阅读理由、## 阅读建议、## Highlights、## 章节。"
-                "带读问题必须是一句中文问题。"
+                "必须按顺序输出以下二级标题：## 问题、## 一句话摘要、## 阅读理由、## 阅读建议、## Highlights、## 章节。"
+                "问题必须是一句中文问题。"
                 "Highlights 必须是 3-5 条项目符号，每条都必须逐字摘录原文，不要翻译、改写或编造。"
                 "一句话摘要必须是一句中文。"
                 "阅读建议只能输出 deep_read、skim 或 skip。"

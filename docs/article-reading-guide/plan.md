@@ -99,7 +99,7 @@ LONG_MARKDOWN = "\n\n".join(
 )
 
 
-VALID_RESPONSE = """## 带读问题
+VALID_RESPONSE = """## 问题
 这篇文章要回答 AI 产品如何在成本和体验之间取舍？
 
 ## Highlights
@@ -129,18 +129,24 @@ def test_parse_ai_markdown_builds_ordered_blocks():
     assert result.reading_recommendation == "deep_read"
     assert [block["type"] for block in result.ai_blocks] == [
         "reading_question",
-        "highlights",
         "summary",
         "reading_reason",
+        "highlights",
         "chapters",
     ]
     assert result.ai_blocks[0] == {
         "type": "reading_question",
-        "title": "带读问题",
+        "title": "问题",
         "content": "这篇文章要回答 AI 产品如何在成本和体验之间取舍？",
         "order": 10,
     }
-    assert result.ai_blocks[1]["content"] == [
+    assert result.ai_blocks[1] == {
+        "type": "summary",
+        "title": "一句话摘要",
+        "content": "文章解释了 AI 产品在体验、成本和可靠性之间的权衡。",
+        "order": 20,
+    }
+    assert result.ai_blocks[2]["content"] == [
         {"text": "原文中的第一句亮点。", "quote_verified": False},
         {"text": "原文中的第二句亮点。", "quote_verified": False},
         {"text": "原文中的第三句亮点。", "quote_verified": False},
@@ -235,7 +241,7 @@ RecommendationValue = Literal["deep_read", "skim", "skip"]
 AiBlock = dict[str, Any]
 
 SECTION_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
-REQUIRED_SECTIONS = {"带读问题", "Highlights", "一句话摘要", "阅读建议", "阅读理由"}
+REQUIRED_SECTIONS = {"问题", "Highlights", "一句话摘要", "阅读建议", "阅读理由"}
 RECOMMENDATIONS = {"deep_read", "skim", "skip"}
 CHAPTER_MIN_NON_WHITESPACE_CHARS = 1200
 CHAPTER_MIN_PARAGRAPHS = 8
@@ -266,7 +272,7 @@ def parse_ai_markdown(markdown: str, *, source_markdown: str) -> ParsedAiMarkdow
     if missing:
         raise AiBlockParseError(f"missing required section: {', '.join(missing)}")
 
-    reading_question = _single_text(sections["带读问题"], "reading question")
+    reading_question = _single_text(sections["问题"], "reading question")
     highlights = _bullet_items(sections["Highlights"])
     if len(highlights) < 3 or len(highlights) > 5:
         raise AiBlockParseError("highlights must contain 3-5 items")
@@ -280,9 +286,21 @@ def parse_ai_markdown(markdown: str, *, source_markdown: str) -> ParsedAiMarkdow
     blocks: list[AiBlock] = [
         {
             "type": "reading_question",
-            "title": "带读问题",
+            "title": "问题",
             "content": reading_question,
             "order": 10,
+        },
+        {
+            "type": "summary",
+            "title": "一句话摘要",
+            "content": summary,
+            "order": 20,
+        },
+        {
+            "type": "reading_reason",
+            "title": "阅读理由",
+            "content": reading_reason,
+            "order": 30,
         },
         {
             "type": "highlights",
@@ -291,18 +309,6 @@ def parse_ai_markdown(markdown: str, *, source_markdown: str) -> ParsedAiMarkdow
                 {"text": item, "quote_verified": False}
                 for item in highlights
             ],
-            "order": 20,
-        },
-        {
-            "type": "summary",
-            "title": "一句话摘要",
-            "content": summary,
-            "order": 30,
-        },
-        {
-            "type": "reading_reason",
-            "title": "阅读理由",
-            "content": reading_reason,
             "order": 40,
         },
     ]
@@ -456,7 +462,7 @@ class ChapterBlockItem(BaseModel):
 
 class ReadingQuestionBlock(BaseModel):
     type: Literal["reading_question"]
-    title: Literal["带读问题"]
+    title: Literal["问题"]
     content: str
     order: int
 
@@ -538,14 +544,14 @@ def test_stream_analyze_markdown_yields_delta_content(monkeypatch: pytest.Monkey
     chunks = list(stream_analyze_markdown_with_deepseek("# Title"))
 
     assert chunks == [
-        "## 带读问题\n",
+        "## 问题\n",
         "这篇文章要回答什么？\n",
     ]
     assert fake_client.chat.completions.kwargs is not None
     assert fake_client.chat.completions.kwargs["stream"] is True
     assert "response_format" not in fake_client.chat.completions.kwargs
     messages = fake_client.chat.completions.kwargs["messages"]
-    assert "## 带读问题" in messages[0]["content"]
+    assert "## 问题" in messages[0]["content"]
     assert "## Highlights" in messages[0]["content"]
     assert "逐字摘录" in messages[0]["content"]
 ```
@@ -554,7 +560,7 @@ Update `FakeCompletions.create` to return:
 
 ```python
 return [
-    FakeChunk("## 带读问题\n"),
+    FakeChunk("## 问题\n"),
     FakeChunk(None),
     FakeChunk("这篇文章要回答什么？\n"),
 ]
@@ -582,8 +588,8 @@ Use this system prompt content:
 
 ```python
 "你是 RSS 阅读前分析助手。请只输出 Markdown，不要输出 JSON。"
-"必须按顺序输出以下二级标题：## 带读问题、## Highlights、## 一句话摘要、## 阅读建议、## 阅读理由、## 章节。"
-"带读问题必须是一句中文问题。"
+"必须按顺序输出以下二级标题：## 问题、## 一句话摘要、## 阅读理由、## 阅读建议、## Highlights、## 章节。"
+"问题必须是一句中文问题。"
 "Highlights 必须是 3-5 条项目符号，每条都必须逐字摘录原文，不要翻译、改写或编造。"
 "一句话摘要必须是一句中文。"
 "阅读建议只能输出 deep_read、skim 或 skip。"
@@ -615,7 +621,7 @@ In `apps/api/tests/test_tasks.py`, update `test_analyze_article_streams_chunks_a
 
 ```python
 valid_markdown_chunks = [
-    "## 带读问题\n这篇文章要回答什么？\n\n",
+    "## 问题\n这篇文章要回答什么？\n\n",
     "## Highlights\n- 原文第一句。\n- 原文第二句。\n- 原文第三句。\n\n",
     "## 一句话摘要\n这是一句话摘要。\n\n",
     "## 阅读建议\nskim\n\n",
@@ -658,7 +664,7 @@ def test_analyze_article_marks_failed_when_ai_markdown_is_invalid(
     monkeypatch.setattr("app.tasks.write_analysis_event", lambda client, article_id, event_type, payload: None)
     monkeypatch.setattr(
         "app.tasks.stream_analyze_markdown_with_deepseek",
-        lambda markdown: iter(["## 带读问题\n缺少其它字段"]),
+        lambda markdown: iter(["## 问题\n缺少其它字段"]),
     )
 
     with pytest.raises(Exception):
@@ -727,7 +733,7 @@ Update `seed_article` in `apps/api/tests/test_articles_api.py` to accept `ai_blo
 ai_blocks=[
     {
         "type": "reading_question",
-        "title": "带读问题",
+        "title": "问题",
         "content": "这篇文章要回答什么？",
         "order": 10,
     },
@@ -735,13 +741,13 @@ ai_blocks=[
         "type": "summary",
         "title": "一句话摘要",
         "content": "来自 block 的摘要。",
-        "order": 30,
+        "order": 20,
     },
     {
         "type": "reading_reason",
         "title": "阅读理由",
         "content": "来自 block 的理由。",
-        "order": 40,
+        "order": 30,
     },
 ]
 ```
@@ -863,7 +869,7 @@ In `apps/web/src/lib/api.ts`, add:
 export type AiBlock =
   | {
       type: "reading_question"
-      title: "带读问题"
+      title: "问题"
       content: string
       order: number
     }
@@ -918,7 +924,7 @@ ai_blocks: [
   },
   {
     type: "reading_question",
-    title: "带读问题",
+    title: "问题",
     content: "这篇文章要回答什么问题？",
     order: 10,
   },
@@ -952,7 +958,7 @@ Set old fallback fixtures with `ai_blocks: null`.
 Change the stream route body chunk to Markdown:
 
 ```ts
-`data: {"text":"## 带读问题\\n这篇文章正在生成什么问题？\\n\\n"}\n\n`
+`data: {"text":"## 问题\\n这篇文章正在生成什么问题？\\n\\n"}\n\n`
 ```
 
 - [ ] **Step 3: Add E2E expectations**

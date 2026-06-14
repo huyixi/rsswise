@@ -9,7 +9,7 @@ RecommendationValue = Literal["deep_read", "skim", "skip"]
 AiBlock = dict[str, Any]
 
 SECTION_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
-REQUIRED_SECTIONS = {"带读问题", "Highlights", "一句话摘要", "阅读建议", "阅读理由"}
+REQUIRED_SECTIONS = {"问题", "Highlights", "一句话摘要", "阅读建议", "阅读理由"}
 RECOMMENDATIONS = {"deep_read", "skim", "skip"}
 CHAPTER_MIN_NON_WHITESPACE_CHARS = 1200
 CHAPTER_MIN_PARAGRAPHS = 8
@@ -40,7 +40,7 @@ def parse_ai_markdown(markdown: str, *, source_markdown: str) -> ParsedAiMarkdow
     if missing:
         raise AiBlockParseError(f"missing required section: {', '.join(missing)}")
 
-    reading_question = _single_text(sections["带读问题"], "reading question")
+    reading_question = _single_text(sections["问题"], "reading question")
     highlights = [
         _normalize_quote_text(item)
         for item in _bullet_items(sections["Highlights"])
@@ -56,15 +56,15 @@ def parse_ai_markdown(markdown: str, *, source_markdown: str) -> ParsedAiMarkdow
 
     blocks: list[AiBlock] = [
         {
-            "type": "summary",
-            "title": "一句话摘要",
-            "content": summary,
+            "type": "reading_question",
+            "title": "问题",
+            "content": reading_question,
             "order": 10,
         },
         {
-            "type": "reading_question",
-            "title": "带读问题",
-            "content": reading_question,
+            "type": "summary",
+            "title": "一句话摘要",
+            "content": summary,
             "order": 20,
         },
         {

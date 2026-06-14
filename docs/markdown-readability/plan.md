@@ -81,7 +81,7 @@ content_markdown: [
 In the existing test `mobile article list opens standalone detail page`, after the assertion for `AI 总结`, add these assertions:
 
 ```ts
-await expect(page.getByText("带读问题")).toBeVisible()
+await expect(page.getByText("问题")).toBeVisible()
 await expect(page.getByText("摘录")).toBeVisible()
 await expect(page.getByText("一句话摘要")).toBeVisible()
 await expect(page.getByText("阅读理由")).toBeVisible()
@@ -130,10 +130,10 @@ await expect(page.getByText("这篇文章正在生成什么问题？")).toBeVisi
 add:
 
 ```ts
-await expect(page.getByRole("heading", { name: "带读问题" })).toBeVisible()
+await expect(page.getByRole("heading", { name: "问题" })).toBeVisible()
 ```
 
-Expected after this step and before implementation: FAIL because current `MarkdownContent` strips the first `## 带读问题` heading.
+Expected after this step and before implementation: FAIL because current `MarkdownContent` strips the first `## 问题` heading.
 
 - [ ] **Step 6: Run targeted E2E and verify failure**
 
@@ -439,7 +439,7 @@ Add this helper below `visibleAiBlocks`:
 function aiBlockLabel(block: AiBlock) {
   switch (block.type) {
     case "reading_question":
-      return "带读问题"
+      return "问题"
     case "highlights":
       return "摘录"
     case "summary":

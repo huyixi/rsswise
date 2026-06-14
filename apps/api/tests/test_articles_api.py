@@ -190,7 +190,7 @@ def test_list_articles_derives_summary_from_ai_blocks(client: TestClient):
         },
         {
             "type": "reading_question",
-            "title": "带读问题",
+            "title": "问题",
             "content": "这篇文章要回答什么？",
             "order": 20,
         },

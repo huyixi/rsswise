@@ -9,6 +9,7 @@ RecommendationValue = Literal["deep_read", "skim", "skip"]
 AiBlock = dict[str, Any]
 
 SECTION_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
+BRACKET_NUM_RE = re.compile(r"^【[^】]*】\s*")
 REQUIRED_SECTIONS = {"问题", "Highlights", "一句话摘要", "阅读建议", "阅读理由"}
 RECOMMENDATIONS = {"deep_read", "skim", "skip"}
 CHAPTER_MIN_NON_WHITESPACE_CHARS = 1200
@@ -145,6 +146,10 @@ def _normalize_quote_text(value: str) -> str:
     text = value.strip()
     while text.startswith(">"):
         text = text[1:].strip()
+
+    text = BRACKET_NUM_RE.sub("", text)
+    while BRACKET_NUM_RE.match(text):
+        text = BRACKET_NUM_RE.sub("", text)
 
     quote_pairs = [('"', '"'), ("'", "'"), ("“", "”"), ("‘", "’")]
     changed = True

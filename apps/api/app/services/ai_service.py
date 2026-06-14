@@ -35,6 +35,7 @@ def build_ai_messages(markdown: str) -> list[dict[str, str]]:
                 "阅读建议只能输出 deep_read、skim 或 skip。"
                 "阅读理由必须用中文说明为什么适合读、略读或跳过。"
                 "章节只在文章确实有明显结构时输出项目符号标题；短讯、公告或结构单一文章可留空。"
+                "不要使用【1】【2】等中文括号编号格式。使用标准 Markdown 列表语法。"
             ),
         },
         {"role": "user", "content": markdown[:40000]},

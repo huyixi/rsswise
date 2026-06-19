@@ -65,6 +65,75 @@ def test_build_digest_epub_contains_article_metadata_and_body() -> None:
     assert "第二段" in chapter
 
 
+def test_build_digest_epub_renders_ai_blocks_like_web_summary() -> None:
+    article = make_article(content_markdown="正文")
+    article.ai_analysis.ai_blocks = [
+        {
+            "type": "reading_reason",
+            "title": "阅读理由",
+            "content": "因为它解释了决策背后的约束。",
+            "order": 30,
+        },
+        {
+            "type": "highlights",
+            "title": "Highlights",
+            "content": [
+                {"text": "第一条原文摘录。", "quote_verified": False},
+                {"text": "第二条原文摘录。", "quote_verified": False},
+            ],
+            "order": 40,
+        },
+        {
+            "type": "chapters",
+            "title": "章节",
+            "content": [{"title": "背景"}, {"title": "影响"}],
+            "order": 50,
+        },
+        {
+            "type": "summary",
+            "title": "一句话摘要",
+            "content": "这是一句和 web 端一致的摘要。",
+            "order": 20,
+        },
+        {
+            "type": "reading_question",
+            "title": "问题",
+            "content": "这篇文章要回答什么？",
+            "order": 10,
+        },
+        {
+            "type": "chapters",
+            "title": "章节",
+            "content": [],
+            "order": 60,
+        },
+    ]
+
+    epub = build_digest_epub([article], digest_date="2026-06-04")
+
+    with zipfile.ZipFile(BytesIO(epub)) as archive:
+        chapter = archive.read("OEBPS/chapters/article-001.xhtml").decode()
+
+    assert "这篇文章要回答什么？" in chapter
+    assert "这是一句和 web 端一致的摘要。" in chapter
+    assert "因为它解释了决策背后的约束。" in chapter
+    assert "第一条原文摘录。" in chapter
+    assert "第二条原文摘录。" in chapter
+    assert "背景" in chapter
+    assert "影响" in chapter
+    assert "旧摘要" not in chapter
+    assert "旧理由" not in chapter
+
+    positions = [
+        chapter.index("这篇文章要回答什么？"),
+        chapter.index("这是一句和 web 端一致的摘要。"),
+        chapter.index("因为它解释了决策背后的约束。"),
+        chapter.index("第一条原文摘录。"),
+        chapter.index("背景"),
+    ]
+    assert positions == sorted(positions)
+
+
 def test_build_digest_epub_allows_missing_body() -> None:
     epub = build_digest_epub([make_article(content_markdown=None)], digest_date="2026-06-04")
 

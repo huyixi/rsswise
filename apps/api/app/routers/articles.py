@@ -15,12 +15,12 @@ from app.models import (
     UserArticleState,
     UserFeedSubscription,
 )
-from app.services.ai_blocks import derive_reading_reason, derive_summary
 from app.services.analysis_events import (
     format_sse_event,
     get_redis_client,
     read_analysis_events,
 )
+from app.services.ai_summary_formatter import format_ai_summary
 from app.tasks import AI_PRIORITY_USER_OPENED, analyze_article_task
 
 router = APIRouter(prefix="/articles", tags=["articles"])
@@ -110,28 +110,23 @@ def list_articles(
         )
 
     rows = db.execute(statement.add_columns(UserArticleState.is_read)).all()
-    return [
-        {
+    response = []
+    for article, is_read in rows:
+        ai_summary = format_ai_summary(article.ai_analysis)
+        response.append({
             "id": str(article.id),
             "title": article.title,
             "source_title": article.feed.title,
             "published_at": article.published_at.isoformat()
             if article.published_at
             else None,
-            "one_sentence_summary": (
-                derive_summary(article.ai_analysis.ai_blocks)
-                if article.ai_analysis and article.ai_analysis.ai_blocks
-                else article.ai_analysis.one_sentence_summary
-                if article.ai_analysis
-                else None
-            ),
+            "one_sentence_summary": ai_summary.one_sentence_summary,
             "reading_recommendation": article.ai_analysis.reading_recommendation.value
             if article.ai_analysis and article.ai_analysis.reading_recommendation
             else None,
             "is_read": bool(is_read),
-        }
-        for article, is_read in rows
-    ]
+        })
+    return response
 
 
 @router.get("/{article_id}")
@@ -141,6 +136,7 @@ def get_article(
     current_user: User = Depends(get_current_user),
 ):
     article = get_subscribed_article_or_404(article_id, current_user, db)
+    ai_summary = format_ai_summary(article.ai_analysis)
 
     return {
         "id": str(article.id),
@@ -148,27 +144,15 @@ def get_article(
         "source_title": article.feed.title,
         "published_at": article.published_at.isoformat() if article.published_at else None,
         "url": article.url,
-        "one_sentence_summary": (
-            derive_summary(article.ai_analysis.ai_blocks)
-            if article.ai_analysis and article.ai_analysis.ai_blocks
-            else article.ai_analysis.one_sentence_summary
-            if article.ai_analysis
-            else None
-        ),
+        "one_sentence_summary": ai_summary.one_sentence_summary,
         "reading_recommendation": article.ai_analysis.reading_recommendation.value
         if article.ai_analysis and article.ai_analysis.reading_recommendation
         else None,
-        "reading_reason": (
-            derive_reading_reason(article.ai_analysis.ai_blocks)
-            if article.ai_analysis and article.ai_analysis.ai_blocks
-            else article.ai_analysis.reading_reason
-            if article.ai_analysis
-            else None
-        ),
+        "reading_reason": ai_summary.reading_reason,
         "content_markdown": article.content.content_markdown if article.content else None,
         "extraction_status": article.content.extraction_status.value if article.content else None,
         "analysis_status": article.ai_analysis.analysis_status.value if article.ai_analysis else None,
-        "ai_blocks": article.ai_analysis.ai_blocks if article.ai_analysis else None,
+        "ai_blocks": ai_summary.ai_blocks,
     }
 
 

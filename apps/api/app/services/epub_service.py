@@ -10,7 +10,7 @@ import httpx
 from PIL import Image as PILImage
 
 from app.models import Article
-from app.services.ai_blocks import derive_reading_reason, derive_summary
+from app.services.ai_summary_formatter import AiSummarySection, format_ai_summary
 
 ZIP_TIMESTAMP = (1980, 1, 1, 0, 0, 0)
 COVER_MAX_W = 800
@@ -29,14 +29,28 @@ def markdown_to_xhtml(markdown: str | None) -> str:
     return "\n".join(f"<p>{escape(part).replace(chr(10), '<br />')}</p>" for part in paragraphs)
 
 
-def article_chapter_xhtml(article: Article, index: int) -> str:
-    summary = ""
-    reason = ""
-    if article.ai_analysis is not None:
-        summary = derive_summary(article.ai_analysis.ai_blocks) or article.ai_analysis.one_sentence_summary or ""
-        reason = derive_reading_reason(article.ai_analysis.ai_blocks) or article.ai_analysis.reading_reason or ""
+def _ai_section_xhtml(section: AiSummarySection) -> str:
+    label = escape(section.label)
+    if section.type in {"highlights", "chapters"}:
+        items = "\n".join(f"<li>{escape(item)}</li>" for item in section.items)
+        return f"<section><h3>{label}</h3><ul>{items}</ul></section>"
 
+    text = escape(section.items[0]) if section.items else ""
+    return f"<section><h3>{label}</h3><p>{text}</p></section>"
+
+
+def ai_summary_xhtml(article: Article) -> str:
+    summary = format_ai_summary(article.ai_analysis)
+    if not summary.sections:
+        return "<section><h2>AI 总结</h2><p>暂无 AI 总结</p></section>"
+
+    sections = "\n".join(_ai_section_xhtml(section) for section in summary.sections)
+    return f"<section><h2>AI 总结</h2>{sections}</section>"
+
+
+def article_chapter_xhtml(article: Article, index: int) -> str:
     source_title = article.feed.title if article.feed else ""
+    ai_summary = ai_summary_xhtml(article)
     article_body = markdown_to_xhtml(article.content.content_markdown if article.content else None)
 
     return dedent(
@@ -52,8 +66,7 @@ def article_chapter_xhtml(article: Article, index: int) -> str:
             <h1>{escape(article.title)}</h1>
             <p><strong>来源：</strong>{escape(source_title)}</p>
             <p><strong>链接：</strong><a href="{escape(article.url)}">{escape(article.url)}</a></p>
-            <p><strong>AI 摘要：</strong>{escape(summary) if summary else "暂无 AI 总结"}</p>
-            <p><strong>阅读理由：</strong>{escape(reason) if reason else "暂无阅读理由"}</p>
+            {ai_summary}
             {article_body}
           </body>
         </html>

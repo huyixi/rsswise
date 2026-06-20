@@ -7,6 +7,7 @@ from uuid import NAMESPACE_URL, uuid5
 from zipfile import ZIP_DEFLATED, ZIP_STORED, ZipFile, ZipInfo
 
 import httpx
+from markdown_it import MarkdownIt
 from PIL import Image as PILImage
 
 from app.models import Article
@@ -17,16 +18,20 @@ COVER_MAX_W = 800
 COVER_MAX_H = 1200
 COVER_JPEG_Q = 85
 COVER_TIMEOUT = 10.0
+MARKDOWN_RENDERER = MarkdownIt(
+    "commonmark",
+    {
+        "html": False,
+        "xhtmlOut": True,
+    },
+).enable("table")
 
 
 def markdown_to_xhtml(markdown: str | None) -> str:
-    if not markdown:
+    if not markdown or not markdown.strip():
         return "<p>正文抽取未完成或失败。</p>"
 
-    paragraphs = [part.strip() for part in markdown.split("\n\n") if part.strip()]
-    if not paragraphs:
-        return "<p>正文抽取未完成或失败。</p>"
-    return "\n".join(f"<p>{escape(part).replace(chr(10), '<br />')}</p>" for part in paragraphs)
+    return MARKDOWN_RENDERER.render(markdown)
 
 
 def _ai_section_xhtml(section: AiSummarySection) -> str:

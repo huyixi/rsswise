@@ -10,6 +10,13 @@ from app.models import Article, ArticleAIAnalysis, ArticleContent, Feed
 from app.services.epub_service import build_digest_epub
 
 
+def chapter_xhtml_for(markdown: str | None) -> str:
+    epub = build_digest_epub([make_article(content_markdown=markdown)], digest_date="2026-06-04")
+
+    with zipfile.ZipFile(BytesIO(epub)) as archive:
+        return archive.read("OEBPS/chapters/article-001.xhtml").decode()
+
+
 def make_article(*, content_markdown: str | None) -> Article:
     feed = Feed(id=uuid4(), title="Example Feed", url="https://example.com/feed.xml")
     article = Article(
@@ -63,6 +70,63 @@ def test_build_digest_epub_contains_article_metadata_and_body() -> None:
     assert "旧理由" not in chapter
     assert "第一段" in chapter
     assert "第二段" in chapter
+
+
+def test_build_digest_epub_renders_markdown_bold_text() -> None:
+    chapter = chapter_xhtml_for("这是一段包含 **重点内容** 的正文。")
+
+    assert "<strong>重点内容</strong>" in chapter
+    assert "**重点内容**" not in chapter
+
+
+def test_build_digest_epub_renders_markdown_heading() -> None:
+    chapter = chapter_xhtml_for("# 小标题")
+
+    assert "<h1>小标题</h1>" in chapter
+
+
+def test_build_digest_epub_renders_markdown_unordered_list() -> None:
+    chapter = chapter_xhtml_for("- 第一项\n- 第二项")
+
+    assert "<ul>" in chapter
+    assert "<li>第一项</li>" in chapter
+    assert "<li>第二项</li>" in chapter
+
+
+def test_build_digest_epub_renders_markdown_link() -> None:
+    chapter = chapter_xhtml_for("[示例链接](https://example.com/docs)")
+
+    assert '<a href="https://example.com/docs">示例链接</a>' in chapter
+
+
+def test_build_digest_epub_renders_markdown_inline_and_fenced_code() -> None:
+    chapter = chapter_xhtml_for("调用 `inline()`。\n\n```python\nprint('hi')\n```")
+
+    assert "<code>inline()</code>" in chapter
+    assert "<pre><code" in chapter
+    assert "print('hi')" in chapter
+
+
+def test_build_digest_epub_renders_markdown_blockquote() -> None:
+    chapter = chapter_xhtml_for("> 引用内容")
+
+    assert "<blockquote>" in chapter
+    assert "<p>引用内容</p>" in chapter
+
+
+def test_build_digest_epub_renders_markdown_table() -> None:
+    chapter = chapter_xhtml_for("| 名称 | 数量 |\n| --- | ---: |\n| 苹果 | 3 |")
+
+    assert "<table>" in chapter
+    assert "<th>名称</th>" in chapter
+    assert "<td>苹果</td>" in chapter
+
+
+def test_build_digest_epub_escapes_raw_html() -> None:
+    chapter = chapter_xhtml_for("<script>alert(1)</script>")
+
+    assert "<script>" not in chapter
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in chapter
 
 
 def test_build_digest_epub_renders_ai_blocks_like_web_summary() -> None:

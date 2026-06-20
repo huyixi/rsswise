@@ -6,7 +6,7 @@ import zipfile
 
 from PIL import Image as PILImage
 
-from app.models import Article, ArticleAIAnalysis, ArticleContent, Feed
+from app.models import AnalysisStatus, Article, ArticleAIAnalysis, ArticleContent, Feed
 from app.services.epub_service import build_digest_epub
 
 
@@ -206,6 +206,23 @@ def test_build_digest_epub_allows_missing_body() -> None:
 
     assert "A useful article" in chapter
     assert "正文抽取未完成或失败" in chapter
+
+
+def test_build_digest_epub_omits_ai_summary_when_analysis_failed() -> None:
+    article = make_article(content_markdown="正文")
+    article.ai_analysis.ai_blocks = None
+    article.ai_analysis.one_sentence_summary = None
+    article.ai_analysis.reading_reason = None
+    article.ai_analysis.analysis_status = AnalysisStatus.failed
+
+    epub = build_digest_epub([article], digest_date="2026-06-04")
+
+    with zipfile.ZipFile(BytesIO(epub)) as archive:
+        chapter = archive.read("OEBPS/chapters/article-001.xhtml").decode()
+
+    assert "AI 总结" not in chapter
+    assert "暂无 AI 总结" not in chapter
+    assert "正文" in chapter
 
 
 def _tiny_jpeg(width: int = 100, height: int = 150) -> bytes:

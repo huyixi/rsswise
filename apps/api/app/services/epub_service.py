@@ -10,7 +10,7 @@ import httpx
 from markdown_it import MarkdownIt
 from PIL import Image as PILImage
 
-from app.models import Article
+from app.models import AnalysisStatus, Article
 from app.services.ai_summary_formatter import AiSummarySection, format_ai_summary
 
 ZIP_TIMESTAMP = (1980, 1, 1, 0, 0, 0)
@@ -45,6 +45,12 @@ def _ai_section_xhtml(section: AiSummarySection) -> str:
 
 
 def ai_summary_xhtml(article: Article) -> str:
+    if (
+        article.ai_analysis is not None
+        and article.ai_analysis.analysis_status == AnalysisStatus.failed
+    ):
+        return ""
+
     summary = format_ai_summary(article.ai_analysis)
     if not summary.sections:
         return "<section><h2>AI 总结</h2><p>暂无 AI 总结</p></section>"

@@ -85,6 +85,58 @@ def article_chapter_xhtml(article: Article, index: int) -> str:
     )
 
 
+def _digest_article_summary(article: Article) -> str:
+    if (
+        article.ai_analysis is not None
+        and article.ai_analysis.analysis_status == AnalysisStatus.failed
+    ):
+        return article.title
+
+    summary = format_ai_summary(article.ai_analysis).one_sentence_summary
+    return summary or article.title
+
+
+def _summary_fragment(value: str) -> str:
+    return " ".join(value.split()).strip().rstrip("。！？.!?")
+
+
+def _digest_summary_sentence(articles: list[Article]) -> str:
+    if not articles:
+        return "本期没有文章。"
+
+    fragments = [
+        fragment
+        for article in articles
+        if (fragment := _summary_fragment(_digest_article_summary(article)))
+    ]
+    if not fragments:
+        return f"本期共 {len(articles)} 篇文章。"
+
+    return f"本期共 {len(articles)} 篇文章，涵盖：{'；'.join(fragments)}。"
+
+
+def digest_summary_chapter_xhtml(articles: list[Article], digest_date: str) -> str:
+    summary = _digest_summary_sentence(articles)
+
+    return dedent(
+        f"""\
+        <?xml version="1.0" encoding="utf-8"?>
+        <!DOCTYPE html>
+        <html xmlns="http://www.w3.org/1999/xhtml" lang="zh-CN">
+          <head>
+            <title>本期摘要</title>
+            <meta charset="utf-8" />
+          </head>
+          <body>
+            <h1>本期摘要</h1>
+            <p><strong>日期：</strong>{escape(digest_date)}</p>
+            <p>{escape(summary)}</p>
+          </body>
+        </html>
+        """
+    )
+
+
 def _stable_identifier(articles: list[Article], digest_date: str) -> str:
     article_keys = "|".join(article.url for article in articles)
     return f"urn:uuid:{uuid5(NAMESPACE_URL, f'rsswise:{digest_date}:{article_keys}')}"
@@ -175,15 +227,20 @@ def build_digest_epub(articles: list[Article], *, digest_date: str) -> bytes:
             f'href="chapters/article-{index:03d}.xhtml" '
             'media-type="application/xhtml+xml" />'
         )
-        for index, _ in enumerate(articles, start=1)
+        for index in range(1, len(articles) + 2)
     )
     spine_items = "\n".join(
         f'<itemref idref="article-{index:03d}" />'
-        for index, _ in enumerate(articles, start=1)
+        for index in range(1, len(articles) + 2)
     )
     nav_items = "\n".join(
-        f'<li><a href="chapters/article-{index:03d}.xhtml">{escape(article.title)}</a></li>'
-        for index, article in enumerate(articles, start=1)
+        [
+            '<li><a href="chapters/article-001.xhtml">本期摘要</a></li>',
+            *(
+                f'<li><a href="chapters/article-{index:03d}.xhtml">{escape(article.title)}</a></li>'
+                for index, article in enumerate(articles, start=2)
+            ),
+        ]
     )
 
     content_opf = dedent(
@@ -271,7 +328,13 @@ def build_digest_epub(articles: list[Article], *, digest_date: str) -> bytes:
             )
         _write_file(archive, "OEBPS/nav.xhtml", nav_xhtml, compress_type=ZIP_DEFLATED)
         _write_file(archive, "OEBPS/toc.ncx", toc_ncx, compress_type=ZIP_DEFLATED)
-        for index, article in enumerate(articles, start=1):
+        _write_file(
+            archive,
+            "OEBPS/chapters/article-001.xhtml",
+            digest_summary_chapter_xhtml(articles, digest_date),
+            compress_type=ZIP_DEFLATED,
+        )
+        for index, article in enumerate(articles, start=2):
             _write_file(
                 archive,
                 f"OEBPS/chapters/article-{index:03d}.xhtml",

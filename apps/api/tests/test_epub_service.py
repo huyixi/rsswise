@@ -14,7 +14,7 @@ def chapter_xhtml_for(markdown: str | None) -> str:
     epub = build_digest_epub([make_article(content_markdown=markdown)], digest_date="2026-06-04")
 
     with zipfile.ZipFile(BytesIO(epub)) as archive:
-        return archive.read("OEBPS/chapters/article-001.xhtml").decode()
+        return archive.read("OEBPS/chapters/article-002.xhtml").decode()
 
 
 def make_article(*, content_markdown: str | None) -> Article:
@@ -56,7 +56,7 @@ def test_build_digest_epub_contains_article_metadata_and_body() -> None:
 
     with zipfile.ZipFile(BytesIO(epub)) as archive:
         names = set(archive.namelist())
-        chapter = archive.read("OEBPS/chapters/article-001.xhtml").decode()
+        chapter = archive.read("OEBPS/chapters/article-002.xhtml").decode()
 
     assert "mimetype" in names
     assert "META-INF/container.xml" in names
@@ -70,6 +70,36 @@ def test_build_digest_epub_contains_article_metadata_and_body() -> None:
     assert "旧理由" not in chapter
     assert "第一段" in chapter
     assert "第二段" in chapter
+
+
+def test_build_digest_epub_starts_with_digest_summary_chapter() -> None:
+    first = make_article(content_markdown="第一篇正文")
+    first.title = "AI 预算"
+    first.url = "https://example.com/ai-budget"
+    first.ai_analysis.ai_blocks[0]["content"] = "AI 成本快速增长，需要控制预算。"
+
+    second = make_article(content_markdown="第二篇正文")
+    second.title = "数据库迁移"
+    second.url = "https://example.com/db-migration"
+    second.ai_analysis.ai_blocks[0]["content"] = "数据库迁移流程需要收紧回滚验证。"
+
+    epub = build_digest_epub([first, second], digest_date="2026-06-04")
+
+    with zipfile.ZipFile(BytesIO(epub)) as archive:
+        summary_chapter = archive.read("OEBPS/chapters/article-001.xhtml").decode()
+        first_article_chapter = archive.read("OEBPS/chapters/article-002.xhtml").decode()
+        second_article_chapter = archive.read("OEBPS/chapters/article-003.xhtml").decode()
+        nav = archive.read("OEBPS/nav.xhtml").decode()
+
+    assert "<title>本期摘要</title>" in summary_chapter
+    assert "<h1>本期摘要</h1>" in summary_chapter
+    assert "本期共 2 篇文章" in summary_chapter
+    assert "AI 成本快速增长，需要控制预算" in summary_chapter
+    assert "数据库迁移流程需要收紧回滚验证" in summary_chapter
+    assert "AI 预算" in first_article_chapter
+    assert "数据库迁移" in second_article_chapter
+    assert '<a href="chapters/article-001.xhtml">本期摘要</a>' in nav
+    assert nav.index("本期摘要") < nav.index("AI 预算")
 
 
 def test_build_digest_epub_renders_markdown_bold_text() -> None:
@@ -176,7 +206,7 @@ def test_build_digest_epub_renders_ai_blocks_like_web_summary() -> None:
     epub = build_digest_epub([article], digest_date="2026-06-04")
 
     with zipfile.ZipFile(BytesIO(epub)) as archive:
-        chapter = archive.read("OEBPS/chapters/article-001.xhtml").decode()
+        chapter = archive.read("OEBPS/chapters/article-002.xhtml").decode()
 
     assert "这篇文章要回答什么？" in chapter
     assert "这是一句和 web 端一致的摘要。" in chapter
@@ -202,7 +232,7 @@ def test_build_digest_epub_allows_missing_body() -> None:
     epub = build_digest_epub([make_article(content_markdown=None)], digest_date="2026-06-04")
 
     with zipfile.ZipFile(BytesIO(epub)) as archive:
-        chapter = archive.read("OEBPS/chapters/article-001.xhtml").decode()
+        chapter = archive.read("OEBPS/chapters/article-002.xhtml").decode()
 
     assert "A useful article" in chapter
     assert "正文抽取未完成或失败" in chapter
@@ -218,7 +248,7 @@ def test_build_digest_epub_omits_ai_summary_when_analysis_failed() -> None:
     epub = build_digest_epub([article], digest_date="2026-06-04")
 
     with zipfile.ZipFile(BytesIO(epub)) as archive:
-        chapter = archive.read("OEBPS/chapters/article-001.xhtml").decode()
+        chapter = archive.read("OEBPS/chapters/article-002.xhtml").decode()
 
     assert "AI 总结" not in chapter
     assert "暂无 AI 总结" not in chapter

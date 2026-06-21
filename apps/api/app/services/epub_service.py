@@ -3,6 +3,7 @@ from __future__ import annotations
 from html import escape
 from io import BytesIO
 from textwrap import dedent
+from urllib.parse import urlsplit
 from uuid import NAMESPACE_URL, uuid5
 from zipfile import ZIP_DEFLATED, ZIP_STORED, ZipFile, ZipInfo
 
@@ -18,6 +19,33 @@ COVER_MAX_W = 800
 COVER_MAX_H = 1200
 COVER_JPEG_Q = 85
 COVER_TIMEOUT = 10.0
+
+
+def _is_epub_internal_href(href: str | None) -> bool:
+    if not href:
+        return False
+
+    parsed = urlsplit(href.strip())
+    return not parsed.scheme and not parsed.netloc
+
+
+def _markdown_link_open(tokens, idx, options, env) -> str:
+    href = tokens[idx].attrGet("href")
+    is_internal = _is_epub_internal_href(href)
+    env.setdefault("rsswise_internal_link_stack", []).append(is_internal)
+    if not is_internal:
+        return ""
+    return MARKDOWN_RENDERER.renderer.renderToken(tokens, idx, options, env)
+
+
+def _markdown_link_close(tokens, idx, options, env) -> str:
+    stack = env.setdefault("rsswise_internal_link_stack", [])
+    is_internal = stack.pop() if stack else False
+    if not is_internal:
+        return ""
+    return MARKDOWN_RENDERER.renderer.renderToken(tokens, idx, options, env)
+
+
 MARKDOWN_RENDERER = MarkdownIt(
     "commonmark",
     {
@@ -25,6 +53,8 @@ MARKDOWN_RENDERER = MarkdownIt(
         "xhtmlOut": True,
     },
 ).enable("table")
+MARKDOWN_RENDERER.renderer.rules["link_open"] = _markdown_link_open
+MARKDOWN_RENDERER.renderer.rules["link_close"] = _markdown_link_close
 
 
 def markdown_to_xhtml(markdown: str | None) -> str:
@@ -76,7 +106,7 @@ def article_chapter_xhtml(article: Article, index: int) -> str:
           <body>
             <h1>{escape(article.title)}</h1>
             <p><strong>来源：</strong>{escape(source_title)}</p>
-            <p><strong>链接：</strong><a href="{escape(article.url)}">{escape(article.url)}</a></p>
+            <p><strong>链接：</strong>{escape(article.url)}</p>
             {ai_summary}
             {article_body}
           </body>

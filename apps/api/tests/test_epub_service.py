@@ -64,6 +64,7 @@ def test_build_digest_epub_contains_article_metadata_and_body() -> None:
     assert "A useful article" in chapter
     assert "Example Feed" in chapter
     assert "https://example.com/a-useful-article" in chapter
+    assert '<a href="https://example.com/a-useful-article">' not in chapter
     assert "来自 block 的 EPUB 摘要" in chapter
     assert "来自 block 的 EPUB 理由" in chapter
     assert "旧摘要" not in chapter
@@ -123,10 +124,11 @@ def test_build_digest_epub_renders_markdown_unordered_list() -> None:
     assert "<li>第二项</li>" in chapter
 
 
-def test_build_digest_epub_renders_markdown_link() -> None:
+def test_build_digest_epub_renders_external_markdown_link_as_plain_text() -> None:
     chapter = chapter_xhtml_for("[示例链接](https://example.com/docs)")
 
-    assert '<a href="https://example.com/docs">示例链接</a>' in chapter
+    assert "示例链接" in chapter
+    assert '<a href="https://example.com/docs">' not in chapter
 
 
 def test_build_digest_epub_renders_markdown_inline_and_fenced_code() -> None:

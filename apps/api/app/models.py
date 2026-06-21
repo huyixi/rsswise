@@ -66,6 +66,28 @@ class FeedImportItemStatus(str, enum.Enum):
     failed = "failed"
 
 
+class ExternalLinkSourceMode(str, enum.Enum):
+    auto = "auto"
+    summary_from_feed = "summary_from_feed"
+    content_markdown = "content_markdown"
+
+
+class ExternalLinkCollectionStatus(str, enum.Enum):
+    collecting = "collecting"
+    prepared = "prepared"
+    generated = "generated"
+    sent = "sent"
+    failed = "failed"
+
+
+class ExternalLinkItemStatus(str, enum.Enum):
+    pending = "pending"
+    extracting = "extracting"
+    success = "success"
+    failed = "failed"
+    timed_out = "timed_out"
+
+
 class Feed(Base):
     __tablename__ = "feeds"
 
@@ -89,8 +111,9 @@ class Article(Base):
     __table_args__ = (UniqueConstraint("url", name="uq_articles_url"),)
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    feed_id: Mapped[uuid.UUID] = mapped_column(
+    feed_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("feeds.id", ondelete="CASCADE"),
+        nullable=True,
         index=True,
     )
     title: Mapped[str] = mapped_column(String(1000))
@@ -106,7 +129,17 @@ class Article(Base):
     guid: Mapped[str | None] = mapped_column(String(2000), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
-    feed: Mapped[Feed] = relationship(back_populates="articles")
+    feed: Mapped[Feed | None] = relationship(back_populates="articles")
+    external_link_collections: Mapped[list["ExternalLinkCollection"]] = relationship(
+        back_populates="source_article",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        foreign_keys="ExternalLinkCollection.source_article_id",
+    )
+    external_link_items: Mapped[list["ExternalLinkCollectionItem"]] = relationship(
+        back_populates="article",
+        foreign_keys="ExternalLinkCollectionItem.article_id",
+    )
     content: Mapped["ArticleContent"] = relationship(
         back_populates="article",
         cascade="all, delete-orphan",
@@ -194,6 +227,93 @@ class ArticleAIAnalysisLog(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     article: Mapped[Article] = relationship(back_populates="ai_analysis_logs")
+
+
+class ExternalLinkCollection(Base):
+    __tablename__ = "external_link_collections"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    source_article_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("articles.id", ondelete="CASCADE"),
+        index=True,
+    )
+    title: Mapped[str] = mapped_column(String(500))
+    target_send_date: Mapped[date] = mapped_column(Date(), index=True)
+    timezone: Mapped[str] = mapped_column(String(64), default="Asia/Shanghai")
+    send_time: Mapped[time] = mapped_column(Time(), default=lambda: time(hour=8, minute=0))
+    prepare_offset_hours: Mapped[int] = mapped_column(Integer, default=6)
+    link_source_mode: Mapped[ExternalLinkSourceMode] = mapped_column(
+        Enum(ExternalLinkSourceMode, name="external_link_source_mode"),
+        default=ExternalLinkSourceMode.auto,
+    )
+    status: Mapped[ExternalLinkCollectionStatus] = mapped_column(
+        Enum(ExternalLinkCollectionStatus, name="external_link_collection_status"),
+        default=ExternalLinkCollectionStatus.collecting,
+        index=True,
+    )
+    prepared_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    generated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utcnow,
+        onupdate=utcnow,
+    )
+
+    source_article: Mapped[Article] = relationship(
+        back_populates="external_link_collections",
+        foreign_keys=[source_article_id],
+    )
+    items: Mapped[list["ExternalLinkCollectionItem"]] = relationship(
+        back_populates="collection",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="ExternalLinkCollectionItem.position",
+    )
+
+
+class ExternalLinkCollectionItem(Base):
+    __tablename__ = "external_link_collection_items"
+    __table_args__ = (
+        UniqueConstraint("collection_id", "normalized_url", name="uq_external_link_items_url"),
+        UniqueConstraint("collection_id", "position", name="uq_external_link_items_position"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    collection_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("external_link_collections.id", ondelete="CASCADE"),
+        index=True,
+    )
+    article_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("articles.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    position: Mapped[int] = mapped_column(Integer)
+    source_url: Mapped[str] = mapped_column(String(2000))
+    normalized_url: Mapped[str] = mapped_column(String(2000), index=True)
+    anchor_text: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    title_hint: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    status: Mapped[ExternalLinkItemStatus] = mapped_column(
+        Enum(ExternalLinkItemStatus, name="external_link_item_status"),
+        default=ExternalLinkItemStatus.pending,
+        index=True,
+    )
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utcnow,
+        onupdate=utcnow,
+    )
+
+    collection: Mapped[ExternalLinkCollection] = relationship(back_populates="items")
+    article: Mapped[Article | None] = relationship(
+        back_populates="external_link_items",
+        foreign_keys=[article_id],
+    )
 
 
 class EmailDigestSetting(Base):

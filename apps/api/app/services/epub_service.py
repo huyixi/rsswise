@@ -130,23 +130,31 @@ def _summary_fragment(value: str) -> str:
     return " ".join(value.split()).strip().rstrip("。！？.!?")
 
 
-def _digest_summary_sentence(articles: list[Article]) -> str:
+def _digest_summary_items_xhtml(articles: list[Article]) -> str:
     if not articles:
-        return "本期没有文章。"
+        return "<p>本期没有文章。</p>"
 
-    fragments = [
-        fragment
-        for article in articles
-        if (fragment := _summary_fragment(_digest_article_summary(article)))
-    ]
-    if not fragments:
-        return f"本期共 {len(articles)} 篇文章。"
+    items = []
+    for index, article in enumerate(articles, start=2):
+        summary = _summary_fragment(_digest_article_summary(article))
+        summary_html = f"<p>{escape(summary)}。</p>" if summary else ""
+        items.append(
+            dedent(
+                f"""\
+                <li>
+                  <a href="article-{index:03d}.xhtml">{escape(article.title)}</a>
+                  {summary_html}
+                </li>
+                """
+            ).strip()
+        )
 
-    return f"本期共 {len(articles)} 篇文章，涵盖：{'；'.join(fragments)}。"
+    item_html = "\n".join(items)
+    return f"<ul>\n{item_html}\n</ul>"
 
 
 def digest_summary_chapter_xhtml(articles: list[Article], digest_date: str) -> str:
-    summary = _digest_summary_sentence(articles)
+    summary_items = _digest_summary_items_xhtml(articles)
 
     return dedent(
         f"""\
@@ -160,7 +168,8 @@ def digest_summary_chapter_xhtml(articles: list[Article], digest_date: str) -> s
           <body>
             <h1>本期摘要</h1>
             <p><strong>日期：</strong>{escape(digest_date)}</p>
-            <p>{escape(summary)}</p>
+            <p>本期共 {len(articles)} 篇文章。</p>
+            {summary_items}
           </body>
         </html>
         """

@@ -95,6 +95,9 @@ def test_build_digest_epub_starts_with_digest_summary_chapter() -> None:
     assert "<title>本期摘要</title>" in summary_chapter
     assert "<h1>本期摘要</h1>" in summary_chapter
     assert "本期共 2 篇文章" in summary_chapter
+    assert "<ul>" in summary_chapter
+    assert '<a href="article-002.xhtml">AI 预算</a>' in summary_chapter
+    assert '<a href="article-003.xhtml">数据库迁移</a>' in summary_chapter
     assert "AI 成本快速增长，需要控制预算" in summary_chapter
     assert "数据库迁移流程需要收紧回滚验证" in summary_chapter
     assert "AI 预算" in first_article_chapter

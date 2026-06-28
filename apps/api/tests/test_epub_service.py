@@ -8,7 +8,9 @@ from PIL import Image as PILImage
 
 from app.models import AnalysisStatus, Article, ArticleAIAnalysis, ArticleContent, Feed
 from app.services.epub_service import (
+    COVER_BRAND_LETTER_SPACING,
     COVER_BRAND_STROKE_WIDTH,
+    COVER_DATE_LETTER_SPACING,
     COVER_IMAGE_GAP,
     COVER_TITLE_DATE_GAP,
     build_digest_epub,
@@ -349,6 +351,8 @@ def test_cover_page_with_image(mocker) -> None:
     assert right_text_pixels < 100
 
     assert COVER_BRAND_STROKE_WIDTH > 0
+    assert COVER_BRAND_LETTER_SPACING == 6
+    assert COVER_DATE_LETTER_SPACING == 3
     assert COVER_TITLE_DATE_GAP == 32
     assert COVER_IMAGE_GAP == 96
     assert COVER_IMAGE_GAP > COVER_TITLE_DATE_GAP

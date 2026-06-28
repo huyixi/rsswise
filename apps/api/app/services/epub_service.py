@@ -28,7 +28,9 @@ COVER_TITLE_DATE_GAP = 32
 COVER_IMAGE_GAP = 96
 COVER_BRAND_FONT_SIZE = 88
 COVER_BRAND_STROKE_WIDTH = 1
+COVER_BRAND_LETTER_SPACING = 6
 COVER_DATE_FONT_SIZE = 40
+COVER_DATE_LETTER_SPACING = 3
 COVER_BACKGROUND = (255, 255, 255)
 COVER_TEXT = (24, 24, 24)
 COVER_MUTED_TEXT = (86, 86, 86)
@@ -241,18 +243,31 @@ def _draw_left_text(
     font: PILImageFont.ImageFont,
     fill: tuple[int, int, int],
     stroke_width: int = 0,
+    letter_spacing: int = 0,
 ) -> int:
     bbox = draw.textbbox((0, 0), text, font=font, stroke_width=stroke_width)
     height = bbox[3] - bbox[1]
     x = COVER_MARGIN_X - bbox[0]
-    draw.text(
-        (x, y - bbox[1]),
-        text,
-        font=font,
-        fill=fill,
-        stroke_width=stroke_width,
-        stroke_fill=fill,
-    )
+
+    for index, character in enumerate(text):
+        character_bbox = draw.textbbox(
+            (0, 0),
+            character,
+            font=font,
+            stroke_width=stroke_width,
+        )
+        draw.text(
+            (x - character_bbox[0], y - bbox[1]),
+            character,
+            font=font,
+            fill=fill,
+            stroke_width=stroke_width,
+            stroke_fill=fill,
+        )
+        x += character_bbox[2] - character_bbox[0]
+        if index < len(text) - 1:
+            x += letter_spacing
+
     return y + height
 
 
@@ -268,6 +283,7 @@ def _compose_cover_jpeg(image: PILImage.Image, digest_date: str) -> bytes:
         font=_cover_font(COVER_BRAND_FONT_SIZE),
         fill=COVER_TEXT,
         stroke_width=COVER_BRAND_STROKE_WIDTH,
+        letter_spacing=COVER_BRAND_LETTER_SPACING,
     )
     y += COVER_TITLE_DATE_GAP
     y = _draw_left_text(
@@ -276,6 +292,7 @@ def _compose_cover_jpeg(image: PILImage.Image, digest_date: str) -> bytes:
         y,
         font=_cover_font(COVER_DATE_FONT_SIZE),
         fill=COVER_MUTED_TEXT,
+        letter_spacing=COVER_DATE_LETTER_SPACING,
     )
     y += COVER_IMAGE_GAP
 

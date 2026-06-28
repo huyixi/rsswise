@@ -69,8 +69,11 @@ def test_build_digest_epub_contains_article_metadata_and_body() -> None:
     assert "来自 block 的 EPUB 理由" in chapter
     assert "旧摘要" not in chapter
     assert "旧理由" not in chapter
+    assert "<hr />" in chapter
     assert "第一段" in chapter
     assert "第二段" in chapter
+    assert chapter.index("来自 block 的 EPUB 理由") < chapter.index("<hr />")
+    assert chapter.index("<hr />") < chapter.index("第一段")
 
 
 def test_build_digest_epub_starts_with_digest_summary_chapter() -> None:
@@ -257,6 +260,7 @@ def test_build_digest_epub_omits_ai_summary_when_analysis_failed() -> None:
 
     assert "AI 总结" not in chapter
     assert "暂无 AI 总结" not in chapter
+    assert "<hr />" not in chapter
     assert "正文" in chapter
 
 

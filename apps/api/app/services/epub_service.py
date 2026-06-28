@@ -104,6 +104,7 @@ def ai_summary_xhtml(article: Article) -> str:
 def article_chapter_xhtml(article: Article, index: int) -> str:
     source_title = article.feed.title if article.feed else ""
     ai_summary = ai_summary_xhtml(article)
+    summary_body_divider = "<hr />" if ai_summary else ""
     article_body = markdown_to_xhtml(article.content.content_markdown if article.content else None)
 
     return dedent(
@@ -120,6 +121,7 @@ def article_chapter_xhtml(article: Article, index: int) -> str:
             <p><strong>来源：</strong>{escape(source_title)}</p>
             <p><strong>链接：</strong>{escape(article.url)}</p>
             {ai_summary}
+            {summary_body_divider}
             {article_body}
           </body>
         </html>

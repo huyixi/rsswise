@@ -24,10 +24,10 @@ COVER_TIMEOUT = 10.0
 COVER_MARGIN_X = 72
 COVER_MARGIN_TOP = 88
 COVER_IMAGE_BOTTOM = 72
-COVER_TEXT_GAP = 16
-COVER_IMAGE_GAP = 64
-COVER_BRAND_FONT_SIZE = 64
-COVER_DATE_FONT_SIZE = 30
+COVER_TITLE_DATE_GAP = 24
+COVER_IMAGE_GAP = 84
+COVER_BRAND_FONT_SIZE = 88
+COVER_DATE_FONT_SIZE = 40
 COVER_BACKGROUND = (255, 255, 255)
 COVER_TEXT = (24, 24, 24)
 COVER_MUTED_TEXT = (86, 86, 86)
@@ -230,7 +230,7 @@ def _cover_font(size: int) -> PILImageFont.ImageFont:
     return PILImageFont.load_default(size=size)
 
 
-def _draw_centered_text(
+def _draw_left_text(
     draw: PILImageDraw.ImageDraw,
     text: str,
     y: int,
@@ -239,9 +239,8 @@ def _draw_centered_text(
     fill: tuple[int, int, int],
 ) -> int:
     bbox = draw.textbbox((0, 0), text, font=font)
-    width = bbox[2] - bbox[0]
     height = bbox[3] - bbox[1]
-    x = (COVER_MAX_W - width) // 2 - bbox[0]
+    x = COVER_MARGIN_X - bbox[0]
     draw.text((x, y - bbox[1]), text, font=font, fill=fill)
     return y + height
 
@@ -251,15 +250,15 @@ def _compose_cover_jpeg(image: PILImage.Image, digest_date: str) -> bytes:
     draw = PILImageDraw.Draw(canvas)
 
     y = COVER_MARGIN_TOP
-    y = _draw_centered_text(
+    y = _draw_left_text(
         draw,
         "RSSWise",
         y,
         font=_cover_font(COVER_BRAND_FONT_SIZE),
         fill=COVER_TEXT,
     )
-    y += COVER_TEXT_GAP
-    y = _draw_centered_text(
+    y += COVER_TITLE_DATE_GAP
+    y = _draw_left_text(
         draw,
         digest_date,
         y,

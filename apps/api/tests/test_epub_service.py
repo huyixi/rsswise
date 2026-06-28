@@ -7,7 +7,7 @@ import zipfile
 from PIL import Image as PILImage
 
 from app.models import AnalysisStatus, Article, ArticleAIAnalysis, ArticleContent, Feed
-from app.services.epub_service import build_digest_epub
+from app.services.epub_service import COVER_IMAGE_GAP, COVER_TITLE_DATE_GAP, build_digest_epub
 
 
 def chapter_xhtml_for(markdown: str | None) -> str:
@@ -326,14 +326,22 @@ def test_cover_page_with_image(mocker) -> None:
     assert cover_img.format == "JPEG"
     assert cover_img.size == (800, 1200)
 
-    top_region = cover_img.crop((0, 0, 800, 220))
-    non_white_pixels = _count_pixels_matching(
-        top_region,
+    top_left_region = cover_img.crop((60, 0, 450, 260))
+    top_right_region = cover_img.crop((520, 0, 800, 260))
+    left_text_pixels = _count_pixels_matching(
+        top_left_region,
         lambda pixel: any(channel < 240 for channel in pixel),
     )
-    assert non_white_pixels > 100
+    right_text_pixels = _count_pixels_matching(
+        top_right_region,
+        lambda pixel: any(channel < 240 for channel in pixel),
+    )
+    assert left_text_pixels > 1_000
+    assert right_text_pixels < 100
 
-    image_region = cover_img.crop((0, 260, 800, 1050))
+    assert COVER_IMAGE_GAP > COVER_TITLE_DATE_GAP
+
+    image_region = cover_img.crop((0, 340, 800, 1050))
     blue_image_pixels = _count_pixels_matching(
         image_region,
         lambda pixel: pixel[0] < 100 and pixel[1] > 100 and pixel[2] > 140,

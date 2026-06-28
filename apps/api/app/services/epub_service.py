@@ -10,6 +10,8 @@ from zipfile import ZIP_DEFLATED, ZIP_STORED, ZipFile, ZipInfo
 import httpx
 from markdown_it import MarkdownIt
 from PIL import Image as PILImage
+from PIL import ImageDraw as PILImageDraw
+from PIL import ImageFont as PILImageFont
 
 from app.models import AnalysisStatus, Article
 from app.services.ai_summary_formatter import AiSummarySection, format_ai_summary
@@ -19,6 +21,16 @@ COVER_MAX_W = 800
 COVER_MAX_H = 1200
 COVER_JPEG_Q = 85
 COVER_TIMEOUT = 10.0
+COVER_MARGIN_X = 72
+COVER_MARGIN_TOP = 88
+COVER_IMAGE_BOTTOM = 72
+COVER_TEXT_GAP = 16
+COVER_IMAGE_GAP = 64
+COVER_BRAND_FONT_SIZE = 64
+COVER_DATE_FONT_SIZE = 30
+COVER_BACKGROUND = (255, 255, 255)
+COVER_TEXT = (24, 24, 24)
+COVER_MUTED_TEXT = (86, 86, 86)
 
 
 def _is_epub_internal_href(href: str | None) -> bool:
@@ -200,7 +212,7 @@ def _first_cover_url(articles: list[Article]) -> str | None:
     return None
 
 
-def _download_cover(url: str) -> bytes | None:
+def _download_cover_image(url: str) -> PILImage.Image | None:
     try:
         response = httpx.get(url, timeout=COVER_TIMEOUT, follow_redirects=True)
         response.raise_for_status()
@@ -208,21 +220,74 @@ def _download_cover(url: str) -> bytes | None:
         return None
 
     try:
-        img = PILImage.open(BytesIO(response.content))
-        img = img.convert("RGB")
-        img.thumbnail((COVER_MAX_W, COVER_MAX_H), PILImage.LANCZOS)
-        buf = BytesIO()
-        img.save(buf, format="JPEG", quality=COVER_JPEG_Q)
-        return buf.getvalue()
+        with PILImage.open(BytesIO(response.content)) as img:
+            return img.convert("RGB")
     except Exception:
         return None
 
 
+def _cover_font(size: int) -> PILImageFont.ImageFont:
+    return PILImageFont.load_default(size=size)
+
+
+def _draw_centered_text(
+    draw: PILImageDraw.ImageDraw,
+    text: str,
+    y: int,
+    *,
+    font: PILImageFont.ImageFont,
+    fill: tuple[int, int, int],
+) -> int:
+    bbox = draw.textbbox((0, 0), text, font=font)
+    width = bbox[2] - bbox[0]
+    height = bbox[3] - bbox[1]
+    x = (COVER_MAX_W - width) // 2 - bbox[0]
+    draw.text((x, y - bbox[1]), text, font=font, fill=fill)
+    return y + height
+
+
+def _compose_cover_jpeg(image: PILImage.Image, digest_date: str) -> bytes:
+    canvas = PILImage.new("RGB", (COVER_MAX_W, COVER_MAX_H), COVER_BACKGROUND)
+    draw = PILImageDraw.Draw(canvas)
+
+    y = COVER_MARGIN_TOP
+    y = _draw_centered_text(
+        draw,
+        "RSSWise",
+        y,
+        font=_cover_font(COVER_BRAND_FONT_SIZE),
+        fill=COVER_TEXT,
+    )
+    y += COVER_TEXT_GAP
+    y = _draw_centered_text(
+        draw,
+        digest_date,
+        y,
+        font=_cover_font(COVER_DATE_FONT_SIZE),
+        fill=COVER_MUTED_TEXT,
+    )
+    y += COVER_IMAGE_GAP
+
+    cover_image = image.copy()
+    cover_image.thumbnail(
+        (
+            COVER_MAX_W - COVER_MARGIN_X * 2,
+            COVER_MAX_H - y - COVER_IMAGE_BOTTOM,
+        ),
+        PILImage.LANCZOS,
+    )
+    canvas.paste(cover_image, ((COVER_MAX_W - cover_image.width) // 2, y))
+
+    buf = BytesIO()
+    canvas.save(buf, format="JPEG", quality=COVER_JPEG_Q)
+    return buf.getvalue()
+
+
 def _cover_page_xhtml(digest_date: str, *, has_image: bool) -> str:
-    image_html = (
+    body_html = (
         '<div class="cover-image"><img src="cover.jpeg" alt="封面" /></div>'
         if has_image
-        else ""
+        else f'<div class="brand">RSSWise</div><div class="date">{digest_date}</div>'
     )
     return dedent(f"""\
         <?xml version="1.0" encoding="utf-8"?>
@@ -235,14 +300,12 @@ def _cover_page_xhtml(digest_date: str, *, has_image: bool) -> str:
               body {{ margin: 2em; font-family: serif; }}
               .brand {{ font-size: 1.5em; font-weight: bold; }}
               .date {{ font-size: 0.9em; color: #555; margin-top: 0.5em; }}
-              .cover-image {{ text-align: center; margin-top: 2em; }}
-              .cover-image img {{ max-width: 100%; max-height: 80vh; object-fit: contain; }}
+              .cover-image {{ text-align: center; }}
+              .cover-image img {{ max-width: 100%; max-height: 95vh; object-fit: contain; }}
             </style>
           </head>
           <body>
-            <div class="brand">RSSWISE</div>
-            <div class="date">{digest_date}</div>
-            {image_html}
+            {body_html}
           </body>
         </html>
         """)
@@ -252,7 +315,8 @@ def build_digest_epub(articles: list[Article], *, digest_date: str) -> bytes:
     identifier = _stable_identifier(articles, digest_date)
 
     cover_url = _first_cover_url(articles)
-    cover_bytes = _download_cover(cover_url) if cover_url else None
+    cover_image = _download_cover_image(cover_url) if cover_url else None
+    cover_bytes = _compose_cover_jpeg(cover_image, digest_date) if cover_image else None
     has_cover_image = cover_bytes is not None
 
     cover_image_manifest = (

@@ -274,8 +274,17 @@ def _mock_httpx_get(mocker, jpeg_bytes: bytes) -> None:
     mocker.patch("app.services.epub_service.httpx.get", return_value=mock_response)
 
 
+def _count_pixels_matching(image: PILImage.Image, predicate) -> int:
+    pixels = (
+        image.get_flattened_data()
+        if hasattr(image, "get_flattened_data")
+        else image.getdata()
+    )
+    return sum(1 for pixel in pixels if predicate(pixel))
+
+
 def test_cover_page_always_present() -> None:
-    """无封面图时：封面页仍然存在，只含 RSSWISE 品牌和日期."""
+    """无封面图时：封面页仍然存在，只含 RSSWise 品牌和日期."""
     epub = build_digest_epub([make_article(content_markdown="正文")], digest_date="2026-06-14")
 
     with zipfile.ZipFile(BytesIO(epub)) as archive:
@@ -285,7 +294,7 @@ def test_cover_page_always_present() -> None:
 
     assert "OEBPS/cover.xhtml" in names
     assert "OEBPS/cover.jpeg" not in names
-    assert "RSSWISE" in cover_xhtml
+    assert "RSSWise" in cover_xhtml
     assert "2026-06-14" in cover_xhtml
     assert 'properties="cover-image"' not in opf
     assert '<itemref idref="cover-page" />' in opf
@@ -293,7 +302,7 @@ def test_cover_page_always_present() -> None:
 
 
 def test_cover_page_with_image(mocker) -> None:
-    """有封面图时：下载成功则嵌入 cover.jpeg 并声明 cover-image."""
+    """有封面图时：下载成功则嵌入合成后的 cover.jpeg 并声明 cover-image."""
     article = make_article(content_markdown="正文")
     article.cover_image_url = "https://example.com/cover.jpg"
 
@@ -315,8 +324,21 @@ def test_cover_page_with_image(mocker) -> None:
 
     cover_img = PILImage.open(BytesIO(cover_jpeg))
     assert cover_img.format == "JPEG"
-    assert cover_img.size[0] <= 800
-    assert cover_img.size[1] <= 1200
+    assert cover_img.size == (800, 1200)
+
+    top_region = cover_img.crop((0, 0, 800, 220))
+    non_white_pixels = _count_pixels_matching(
+        top_region,
+        lambda pixel: any(channel < 240 for channel in pixel),
+    )
+    assert non_white_pixels > 100
+
+    image_region = cover_img.crop((0, 260, 800, 1050))
+    blue_image_pixels = _count_pixels_matching(
+        image_region,
+        lambda pixel: pixel[0] < 100 and pixel[1] > 100 and pixel[2] > 140,
+    )
+    assert blue_image_pixels > 10_000
 
 
 def test_cover_takes_first_available_cover_url(mocker) -> None:
@@ -352,7 +374,7 @@ def test_cover_download_failure_graceful(mocker) -> None:
 
     assert "OEBPS/cover.xhtml" in names
     assert "OEBPS/cover.jpeg" not in names
-    assert "RSSWISE" in cover_xhtml
+    assert "RSSWise" in cover_xhtml
     assert "2026-06-14" in cover_xhtml
     assert 'src="cover.jpeg"' not in cover_xhtml
     assert 'properties="cover-image"' not in opf

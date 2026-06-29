@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState } from "react"
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+} from "react"
 import { useMutation, useQuery } from "@tanstack/react-query"
 import { Link, useNavigate, useOutletContext, useSearchParams } from "react-router-dom"
 import {
@@ -6,10 +12,21 @@ import {
   BookOpenIcon,
   InboxIcon,
   PlusIcon,
+  Trash2Icon,
   XIcon,
 } from "lucide-react"
 
 import { EmailDigestSettingsDialog } from "@/components/email-digest-settings-dialog"
+import {
+  AlertDialog,
+  AlertDialogClose,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogPopup,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,7 +37,14 @@ import {
 import { Spinner } from "@/components/ui/spinner"
 import { useIsMobile } from "@/hooks/use-media-query"
 import { cn } from "@/lib/utils"
-import { apiGet, apiPost, type ArticleDetail, type ArticleListItem, type Feed } from "@/lib/api"
+import {
+  apiDelete,
+  apiGet,
+  apiPost,
+  type ArticleDetail,
+  type ArticleListItem,
+  type Feed,
+} from "@/lib/api"
 import { queryClient } from "@/lib/query-client"
 import { queryKeys } from "@/lib/query-keys"
 import {
@@ -37,6 +61,12 @@ type AppChromeContext = {
   email: string | undefined
   isLoggingOut: boolean
   onLogout: () => void
+}
+
+type FeedContextMenuState = {
+  feed: Feed
+  x: number
+  y: number
 }
 
 const primaryNavItems: Array<{
@@ -97,10 +127,93 @@ function toggleButtonClassName(active: boolean) {
   )
 }
 
+function feedLabel(feed: Feed) {
+  return feed.title ?? feed.url
+}
+
+function clampContextMenuPosition(x: number, y: number) {
+  const menuWidth = 176
+  const menuHeight = 48
+  const inset = 8
+  return {
+    x: Math.max(inset, Math.min(x, window.innerWidth - menuWidth - inset)),
+    y: Math.max(inset, Math.min(y, window.innerHeight - menuHeight - inset)),
+  }
+}
+
+function FeedContextMenu({
+  menu,
+  onClose,
+  onUnsubscribe,
+}: {
+  menu: FeedContextMenuState | null
+  onClose: () => void
+  onUnsubscribe: (feed: Feed) => void
+}) {
+  const menuRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (!menu) return
+
+    menuRef.current?.focus()
+
+    function handlePointerDown(event: PointerEvent) {
+      if (menuRef.current?.contains(event.target as Node)) return
+      onClose()
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose()
+    }
+
+    function handleWindowChange() {
+      onClose()
+    }
+
+    window.addEventListener("pointerdown", handlePointerDown)
+    window.addEventListener("keydown", handleKeyDown)
+    window.addEventListener("resize", handleWindowChange)
+    window.addEventListener("scroll", handleWindowChange, true)
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown)
+      window.removeEventListener("keydown", handleKeyDown)
+      window.removeEventListener("resize", handleWindowChange)
+      window.removeEventListener("scroll", handleWindowChange, true)
+    }
+  }, [menu, onClose])
+
+  if (!menu) return null
+
+  return (
+    <div
+      ref={menuRef}
+      role="menu"
+      tabIndex={-1}
+      aria-label={`${feedLabel(menu.feed)} 操作`}
+      className="fixed z-50 min-w-44 rounded-lg border bg-popover p-1 text-popover-foreground shadow-lg outline-none"
+      style={{ left: menu.x, top: menu.y }}
+    >
+      <button
+        type="button"
+        role="menuitem"
+        className="flex min-h-8 w-full items-center gap-2 rounded-sm px-2 py-1 text-left text-sm text-destructive-foreground outline-none transition-colors hover:bg-accent focus:bg-accent"
+        onClick={() => {
+          onUnsubscribe(menu.feed)
+          onClose()
+        }}
+      >
+        <Trash2Icon aria-hidden="true" className="size-4 shrink-0" />
+        <span>退订</span>
+      </button>
+    </div>
+  )
+}
+
 function WorkbenchSidebar({
   feeds,
   feedId,
   onSelectFeed,
+  onFeedUnsubscribed,
   userEmail,
   isLoggingOut,
   onLogout,
@@ -110,6 +223,7 @@ function WorkbenchSidebar({
   feeds: Feed[] | undefined
   feedId: string | null
   onSelectFeed: (id: string | null) => void
+  onFeedUnsubscribed: (id: string) => void
   userEmail: string | undefined
   isLoggingOut: boolean
   onLogout: () => void
@@ -117,6 +231,38 @@ function WorkbenchSidebar({
   onToggleFeedPanel: () => void
 }) {
   const [emailDialogOpen, setEmailDialogOpen] = useState(false)
+  const [feedContextMenu, setFeedContextMenu] = useState<FeedContextMenuState | null>(null)
+  const [feedToUnsubscribe, setFeedToUnsubscribe] = useState<Feed | null>(null)
+
+  const unsubscribeFeedMutation = useMutation({
+    mutationFn: (nextFeedId: string) => apiDelete(`/feeds/${nextFeedId}`),
+    onSuccess: (_, unsubscribedFeedId) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.feeds.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.articles.all })
+      onFeedUnsubscribed(unsubscribedFeedId)
+      setFeedToUnsubscribe(null)
+    },
+  })
+
+  const closeFeedContextMenu = useCallback(() => {
+    setFeedContextMenu(null)
+  }, [])
+
+  function openFeedContextMenu(
+    event: ReactMouseEvent<HTMLButtonElement>,
+    feed: Feed,
+  ) {
+    event.preventDefault()
+    event.stopPropagation()
+    unsubscribeFeedMutation.reset()
+    const position = clampContextMenuPosition(event.clientX, event.clientY)
+    setFeedContextMenu({ feed, ...position })
+  }
+
+  function requestUnsubscribeFeed(feed: Feed) {
+    unsubscribeFeedMutation.reset()
+    setFeedToUnsubscribe(feed)
+  }
 
   return (
     <aside className="flex w-[220px] shrink-0 flex-col border-r bg-background px-3 py-3">
@@ -169,6 +315,7 @@ function WorkbenchSidebar({
                 type="button"
                 className={navButtonClassName(feed.id === feedId)}
                 onClick={() => onSelectFeed(feed.id)}
+                onContextMenu={(event) => openFeedContextMenu(event, feed)}
               >
                 {feed.favicon_url ? (
                   <img
@@ -177,12 +324,18 @@ function WorkbenchSidebar({
                     className="size-3.5 shrink-0 rounded-sm"
                   />
                 ) : null}
-                <span className="truncate">{feed.title ?? feed.url}</span>
+                <span className="truncate">{feedLabel(feed)}</span>
               </button>
             ))
           )}
         </div>
       </nav>
+
+      <FeedContextMenu
+        menu={feedContextMenu}
+        onClose={closeFeedContextMenu}
+        onUnsubscribe={requestUnsubscribeFeed}
+      />
 
       <div className="border-t pt-3">
         <DropdownMenu>
@@ -214,6 +367,56 @@ function WorkbenchSidebar({
         open={emailDialogOpen}
         onOpenChange={setEmailDialogOpen}
       />
+
+      <AlertDialog
+        open={feedToUnsubscribe !== null}
+        onOpenChange={(open) => {
+          if (!open && !unsubscribeFeedMutation.isPending) {
+            setFeedToUnsubscribe(null)
+          }
+        }}
+      >
+        <AlertDialogPopup>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              退订「{feedToUnsubscribe ? feedLabel(feedToUnsubscribe) : ""}」？
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              退订后，这个来源的文章将不再出现在你的文章列表中。若没有其他用户订阅，该 Feed 和文章缓存会被删除。
+            </AlertDialogDescription>
+            {unsubscribeFeedMutation.isError ? (
+              <p className="text-sm text-destructive-foreground">
+                {unsubscribeFeedMutation.error?.message || "退订失败"}
+              </p>
+            ) : null}
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogClose
+              render={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  disabled={unsubscribeFeedMutation.isPending}
+                />
+              }
+            >
+              取消
+            </AlertDialogClose>
+            <Button
+              type="button"
+              variant="destructive"
+              loading={unsubscribeFeedMutation.isPending}
+              disabled={!feedToUnsubscribe}
+              onClick={() => {
+                if (!feedToUnsubscribe) return
+                unsubscribeFeedMutation.mutate(feedToUnsubscribe.id)
+              }}
+            >
+              退订
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogPopup>
+      </AlertDialog>
     </aside>
   )
 }
@@ -615,6 +818,16 @@ export function ArticleWorkbenchPage() {
     })
   }
 
+  function handleFeedUnsubscribed(unsubscribedFeedId: string) {
+    if (feedId !== unsubscribedFeedId) return
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      next.delete("feed_id")
+      next.delete("id")
+      return next
+    })
+  }
+
   const selectedFeed = feedsQuery.data?.find((f) => f.id === feedId)
   const feedName = selectedFeed?.title ?? selectedFeed?.url ?? null
 
@@ -691,6 +904,7 @@ export function ArticleWorkbenchPage() {
         feeds={feedsQuery.data}
         feedId={feedId}
         onSelectFeed={handleSelectFeed}
+        onFeedUnsubscribed={handleFeedUnsubscribed}
         userEmail={appChrome.email}
         isLoggingOut={appChrome.isLoggingOut}
         onLogout={appChrome.onLogout}

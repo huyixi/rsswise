@@ -662,6 +662,115 @@ test("desktop sidebar feed click filters articles and toggles back", async ({
   )
 })
 
+test("desktop sidebar feed context menu unsubscribes selected feed", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await mockAuthenticatedUser(page)
+
+  const feedId = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+  const feedName = "Test Feed"
+  const feedArticleId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  let feeds = [
+    {
+      id: feedId,
+      url: "https://example.com/feed.xml",
+      title: feedName,
+      site_url: null,
+      favicon_url: null,
+      last_fetched_at: null,
+    },
+  ]
+  let deleteRequestCount = 0
+
+  await page.route("**/api/feeds", async (route) => {
+    await route.fulfill({ json: feeds })
+  })
+
+  await page.route(`**/api/feeds/${feedId}`, async (route) => {
+    expect(route.request().method()).toBe("DELETE")
+    deleteRequestCount += 1
+    feeds = []
+    await route.fulfill({ status: 204, body: "" })
+  })
+
+  await page.route("**/api/articles?**", async (route) => {
+    const url = new URL(route.request().url())
+    if (url.searchParams.get("feed_id") === feedId) {
+      await route.fulfill({
+        json: [
+          {
+            id: feedArticleId,
+            title: "Feed 专属文章",
+            source_title: feedName,
+            published_at: "2026-06-04T08:00:00Z",
+            one_sentence_summary: "这是 Feed 里的文章",
+            reading_recommendation: "deep_read",
+            is_read: false,
+          },
+        ],
+      })
+      return
+    }
+
+    await route.fulfill({ json: articleList })
+  })
+
+  await page.route(/\/api\/articles\/[^/]+$/, async (route) => {
+    if (route.request().method() !== "GET") {
+      await route.fallback()
+      return
+    }
+
+    const articleId = new URL(route.request().url()).pathname.split("/").at(-1)
+    if (articleId === feedArticleId) {
+      await route.fulfill({
+        json: {
+          id: feedArticleId,
+          title: "Feed 专属文章",
+          source_title: feedName,
+          published_at: "2026-06-04T08:00:00Z",
+          url: "https://example.com/feed-article",
+          one_sentence_summary: "这是 Feed 里的文章",
+          reading_recommendation: "deep_read",
+          reading_reason: null,
+          content_markdown: "这是 Feed 专属文章的正文。",
+          extraction_status: "success",
+          analysis_status: "success",
+          ai_blocks: null,
+        },
+      })
+    } else if (articleId === firstArticleId) {
+      await route.fulfill({ json: articleDetail })
+    } else {
+      await route.fallback()
+    }
+  })
+
+  await mockReadRoute(page)
+
+  await page.goto(`/articles?feed_id=${feedId}`)
+  await expect(page).toHaveURL(/feed_id=ffffffff/)
+  await expect(page.getByRole("heading", { name: "Feed 专属文章" })).toBeVisible()
+
+  await page.getByRole("button", { name: feedName }).click({ button: "right" })
+  await expect(page.getByRole("menuitem", { name: "退订" })).toBeVisible()
+
+  await page.getByRole("menuitem", { name: "退订" }).click()
+  await expect(
+    page.getByRole("heading", { name: `退订「${feedName}」？` }),
+  ).toBeVisible()
+
+  await page.getByRole("button", { name: "退订" }).click()
+
+  await expect(page).not.toHaveURL(/feed_id/)
+  await expect(page.getByRole("button", { name: feedName })).toHaveCount(0)
+  await expect(
+    page.getByRole("button", { name: /移动端文章详情测试/ }),
+  ).toBeVisible()
+  expect(deleteRequestCount).toBe(1)
+})
+
 test("desktop sidebar feed switch preserves view and recommendation filters", async ({
   page,
 }) => {

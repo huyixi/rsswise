@@ -163,6 +163,16 @@ def delete_feed_subscription(db: Session, feed_id: UUID, user: User) -> None:
     subscription = db.get(UserFeedSubscription, (user.id, feed_id))
     if subscription is not None:
         db.delete(subscription)
+        db.flush()
+        remaining_subscription = db.execute(
+            select(UserFeedSubscription.user_id)
+            .where(UserFeedSubscription.feed_id == feed_id)
+            .limit(1)
+        ).first()
+        if remaining_subscription is None:
+            feed = db.get(Feed, feed_id)
+            if feed is not None:
+                db.delete(feed)
         db.commit()
 
 

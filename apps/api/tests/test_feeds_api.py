@@ -69,7 +69,7 @@ def test_feed_list_only_returns_current_user_subscriptions(client: TestClient):
     assert [item["title"] for item in response.json()] == ["Shared Feed"]
 
 
-def test_deleting_feed_only_removes_current_user_subscription(client: TestClient):
+def test_deleting_last_feed_subscription_removes_feed(client: TestClient):
     first_user = register(client, "first@example.com")
     session_local = client.app.state.testing_session_local
     with session_local() as db:
@@ -84,8 +84,42 @@ def test_deleting_feed_only_removes_current_user_subscription(client: TestClient
 
     assert response.status_code == 204
     with session_local() as db:
-        assert db.get(Feed, feed_id) is not None
+        assert db.get(Feed, feed_id) is None
         assert db.execute(select(UserFeedSubscription)).scalars().all() == []
+
+
+def test_deleting_shared_feed_only_removes_current_user_subscription(
+    client: TestClient,
+):
+    first_user = register(client, "first@example.com")
+    second_user = register(client, "second@example.com")
+    assert client.post(
+        "/auth/login",
+        json={"email": "first@example.com", "password": "password123"},
+    ).status_code == 200
+
+    session_local = client.app.state.testing_session_local
+    with session_local() as db:
+        feed = Feed(title="Shared Feed", url="https://example.com/feed.xml")
+        db.add(feed)
+        db.flush()
+        db.add_all(
+            [
+                UserFeedSubscription(user_id=UUID(first_user["id"]), feed_id=feed.id),
+                UserFeedSubscription(user_id=UUID(second_user["id"]), feed_id=feed.id),
+            ]
+        )
+        db.commit()
+        feed_id = feed.id
+
+    response = client.delete(f"/feeds/{feed_id}")
+
+    assert response.status_code == 204
+    with session_local() as db:
+        assert db.get(Feed, feed_id) is not None
+        subscriptions = db.execute(select(UserFeedSubscription)).scalars().all()
+        assert len(subscriptions) == 1
+        assert subscriptions[0].user_id == UUID(second_user["id"])
 
 
 def test_create_url_import_requires_login(client: TestClient):

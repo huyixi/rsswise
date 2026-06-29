@@ -138,10 +138,11 @@ def test_build_digest_epub_renders_markdown_unordered_list() -> None:
 
 
 def test_build_digest_epub_renders_external_markdown_link_as_plain_text() -> None:
-    chapter = chapter_xhtml_for("[示例链接](https://example.com/docs)")
+    chapter = chapter_xhtml_for("[示例链接](https://example.com/docs?a=1&b=2)")
 
     assert "示例链接" in chapter
-    assert '<a href="https://example.com/docs">' not in chapter
+    assert "https://example.com/docs?a=1&amp;b=2" in chapter
+    assert '<a href="https://example.com/docs?a=1&amp;b=2">' not in chapter
 
 
 def test_build_digest_epub_renders_markdown_inline_and_fenced_code() -> None:

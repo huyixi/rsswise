@@ -47,17 +47,23 @@ def _is_epub_internal_href(href: str | None) -> bool:
 def _markdown_link_open(tokens, idx, options, env) -> str:
     href = tokens[idx].attrGet("href")
     is_internal = _is_epub_internal_href(href)
-    env.setdefault("rsswise_internal_link_stack", []).append(is_internal)
+    env.setdefault("rsswise_link_stack", []).append(
+        {
+            "href": href.strip() if href else "",
+            "is_internal": is_internal,
+        }
+    )
     if not is_internal:
         return ""
     return MARKDOWN_RENDERER.renderer.renderToken(tokens, idx, options, env)
 
 
 def _markdown_link_close(tokens, idx, options, env) -> str:
-    stack = env.setdefault("rsswise_internal_link_stack", [])
-    is_internal = stack.pop() if stack else False
-    if not is_internal:
-        return ""
+    stack = env.setdefault("rsswise_link_stack", [])
+    link = stack.pop() if stack else {"href": "", "is_internal": False}
+    if not link["is_internal"]:
+        href = link["href"]
+        return f" ({escape(href)})" if href else ""
     return MARKDOWN_RENDERER.renderer.renderToken(tokens, idx, options, env)
 
 

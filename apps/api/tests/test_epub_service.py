@@ -6,7 +6,14 @@ import zipfile
 
 from PIL import Image as PILImage
 
-from app.models import AnalysisStatus, Article, ArticleAIAnalysis, ArticleContent, Feed
+from app.models import (
+    AnalysisStatus,
+    Article,
+    ArticleAIAnalysis,
+    ArticleContent,
+    Feed,
+    ReadingRecommendation,
+)
 from app.services.epub_service import (
     COVER_BRAND_LETTER_SPACING,
     COVER_BRAND_STROKE_WIDTH,
@@ -50,6 +57,7 @@ def make_article(*, content_markdown: str | None) -> Article:
             },
         ],
         one_sentence_summary="旧摘要",
+        reading_recommendation=ReadingRecommendation.deep_read,
         reading_reason="旧理由",
     )
     return article
@@ -72,15 +80,18 @@ def test_build_digest_epub_contains_article_metadata_and_body() -> None:
     assert "Example Feed" in chapter
     assert "https://example.com/a-useful-article" in chapter
     assert '<a href="https://example.com/a-useful-article">' not in chapter
+    assert "deep_read" not in chapter
+    assert "文章摘要" in chapter
+    assert "AI 评注" in chapter
     assert "来自 block 的 EPUB 摘要" in chapter
     assert "来自 block 的 EPUB 理由" in chapter
     assert "旧摘要" not in chapter
     assert "旧理由" not in chapter
-    assert "<hr />" in chapter
+    assert chapter.count("<hr />") == 2
     assert "第一段" in chapter
     assert "第二段" in chapter
-    assert chapter.index("来自 block 的 EPUB 理由") < chapter.index("<hr />")
-    assert chapter.index("<hr />") < chapter.index("第一段")
+    assert chapter.index("来自 block 的 EPUB 摘要") < chapter.index("第一段")
+    assert chapter.index("第一段") < chapter.index("来自 block 的 EPUB 理由")
 
 
 def test_build_digest_epub_starts_with_digest_summary_chapter() -> None:
@@ -175,7 +186,7 @@ def test_build_digest_epub_escapes_raw_html() -> None:
     assert "&lt;script&gt;alert(1)&lt;/script&gt;" in chapter
 
 
-def test_build_digest_epub_renders_ai_blocks_like_web_summary() -> None:
+def test_build_digest_epub_renders_article_ai_sections_in_reading_order() -> None:
     article = make_article(content_markdown="正文")
     article.ai_analysis.ai_blocks = [
         {
@@ -233,13 +244,22 @@ def test_build_digest_epub_renders_ai_blocks_like_web_summary() -> None:
     assert "影响" in chapter
     assert "旧摘要" not in chapter
     assert "旧理由" not in chapter
+    assert "AI 总结" not in chapter
+    assert "阅读理由" not in chapter
+    assert "文章摘要" in chapter
+    assert "问题导读" in chapter
+    assert "AI 评注" in chapter
+    assert "章节结构" in chapter
+    assert "摘录" in chapter
+    assert "deep_read" not in chapter
 
     positions = [
-        chapter.index("这篇文章要回答什么？"),
         chapter.index("这是一句和 web 端一致的摘要。"),
+        chapter.index("这篇文章要回答什么？"),
+        chapter.index("正文"),
         chapter.index("因为它解释了决策背后的约束。"),
-        chapter.index("第一条原文摘录。"),
         chapter.index("背景"),
+        chapter.index("第一条原文摘录。"),
     ]
     assert positions == sorted(positions)
 

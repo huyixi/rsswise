@@ -85,35 +85,68 @@ def markdown_to_xhtml(markdown: str | None) -> str:
     return MARKDOWN_RENDERER.render(markdown)
 
 
-def _ai_section_xhtml(section: AiSummarySection) -> str:
-    label = escape(section.label)
+def _ai_section_xhtml(section: AiSummarySection, *, label: str | None = None) -> str:
+    label = escape(label or section.label)
     if section.type in {"highlights", "chapters"}:
         items = "\n".join(f"<li>{escape(item)}</li>" for item in section.items)
-        return f"<section><h3>{label}</h3><ul>{items}</ul></section>"
+        return f"<section><h2>{label}</h2><ul>{items}</ul></section>"
 
     text = escape(section.items[0]) if section.items else ""
-    return f"<section><h3>{label}</h3><p>{text}</p></section>"
+    return f"<section><h2>{label}</h2><p>{text}</p></section>"
 
 
-def ai_summary_xhtml(article: Article) -> str:
+def _ai_sections_xhtml(
+    sections: list[AiSummarySection],
+    *,
+    type_order: tuple[str, ...],
+    labels: dict[str, str],
+) -> str:
+    rendered_sections = []
+    for section_type in type_order:
+        rendered_sections.extend(
+            _ai_section_xhtml(section, label=labels[section_type])
+            for section in sections
+            if section.type == section_type
+        )
+    return "\n".join(rendered_sections)
+
+
+def article_ai_xhtml(article: Article) -> tuple[str, str]:
     if (
         article.ai_analysis is not None
         and article.ai_analysis.analysis_status == AnalysisStatus.failed
     ):
-        return ""
+        return "", ""
 
     summary = format_ai_summary(article.ai_analysis)
     if not summary.sections:
-        return "<section><h2>AI 总结</h2><p>暂无 AI 总结</p></section>"
+        return "", ""
 
-    sections = "\n".join(_ai_section_xhtml(section) for section in summary.sections)
-    return f"<section><h2>AI 总结</h2>{sections}</section>"
+    preface = _ai_sections_xhtml(
+        summary.sections,
+        type_order=("summary", "reading_question"),
+        labels={
+            "summary": "文章摘要",
+            "reading_question": "问题导读",
+        },
+    )
+    afterword = _ai_sections_xhtml(
+        summary.sections,
+        type_order=("reading_reason", "chapters", "highlights"),
+        labels={
+            "reading_reason": "AI 评注",
+            "chapters": "章节结构",
+            "highlights": "摘录",
+        },
+    )
+    return preface, afterword
 
 
 def article_chapter_xhtml(article: Article, index: int) -> str:
     source_title = article.feed.title if article.feed else ""
-    ai_summary = ai_summary_xhtml(article)
-    summary_body_divider = "<hr />" if ai_summary else ""
+    ai_preface, ai_afterword = article_ai_xhtml(article)
+    preface_body_divider = "<hr />" if ai_preface else ""
+    body_afterword_divider = "<hr />" if ai_afterword else ""
     article_body = markdown_to_xhtml(article.content.content_markdown if article.content else None)
 
     return dedent(
@@ -129,9 +162,11 @@ def article_chapter_xhtml(article: Article, index: int) -> str:
             <h1>{escape(article.title)}</h1>
             <p><strong>来源：</strong>{escape(source_title)}</p>
             <p><strong>链接：</strong>{escape(article.url)}</p>
-            {ai_summary}
-            {summary_body_divider}
+            {ai_preface}
+            {preface_body_divider}
             {article_body}
+            {body_afterword_divider}
+            {ai_afterword}
           </body>
         </html>
         """

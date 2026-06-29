@@ -335,7 +335,8 @@ def test_cover_page_with_image(mocker) -> None:
 
     cover_img = PILImage.open(BytesIO(cover_jpeg))
     assert cover_img.format == "JPEG"
-    assert cover_img.size == (800, 1200)
+    assert cover_img.size == (800, 1000)
+    assert "max-height: 80vh" in cover_xhtml
 
     top_left_region = cover_img.crop((60, 0, 450, 260))
     top_right_region = cover_img.crop((520, 0, 800, 260))
@@ -357,7 +358,7 @@ def test_cover_page_with_image(mocker) -> None:
     assert COVER_IMAGE_GAP == 96
     assert COVER_IMAGE_GAP > COVER_TITLE_DATE_GAP
 
-    image_region = cover_img.crop((0, 340, 800, 1050))
+    image_region = cover_img.crop((0, 340, 800, 930))
     blue_image_pixels = _count_pixels_matching(
         image_region,
         lambda pixel: pixel[0] < 100 and pixel[1] > 100 and pixel[2] > 140,

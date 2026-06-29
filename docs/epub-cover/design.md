@@ -10,7 +10,7 @@ EPUB 摘要生成时新增封面页。封面页始终可用；当文章中存在
 - **封面呈现**：始终生成一个 XHTML 封面页作为 spine 第一项。有图时 `cover.xhtml` 显示合成后的 `cover.jpeg`；无图或下载失败时显示 `RSSWise` + 日期文字 fallback。
 - **封面图属性**：有封面图时，在 OPF manifest 中声明合成后的 `cover.jpeg` 为 `properties="cover-image"`，让阅读器书架封面也包含品牌、日期和文章图。
 - **图片下载时机**：在 `build_digest_epub()` 中实时下载，不预缓存。
-- **图片处理**：Pillow 创建 800×1200 白底画布，左对齐逐字符绘制加粗大号 `RSSWise` 和日期，标题字间距为 6px，日期字间距为 3px，标题与日期的 gap 为 32px，将文章图等比缩放后居中放在下方，图片与日期的 gap 为 96px，输出 JPEG（quality 85）。
+- **图片处理**：Pillow 创建 800×1000 白底画布，左对齐逐字符绘制加粗大号 `RSSWise` 和日期，标题字间距为 6px，日期字间距为 3px，标题与日期的 gap 为 32px，将文章图等比缩放后居中放在下方，图片与日期的 gap 为 96px，输出 JPEG（quality 85）。
 - **下载工具**：使用生产依赖中的 `httpx`。
 - **降级行为**：无论是否有封面图，封面页始终存在。无图或下载失败时，封面页仅显示 `RSSWise` + 日期，OPF manifest 不声明 `cover-image`。
 
@@ -70,7 +70,7 @@ OEBPS/chapters/article-001.xhtml
 | 常量 | 值 |
 |---|---|
 | COVER_MAX_WIDTH | 800 px |
-| COVER_MAX_HEIGHT | 1200 px |
+| COVER_MAX_HEIGHT | 1000 px |
 | COVER_JPEG_QUALITY | 85 |
 | COVER_DOWNLOAD_TIMEOUT | 10 s |
 | COVER_BRAND_LETTER_SPACING | 6 px |

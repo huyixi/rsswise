@@ -18,7 +18,7 @@ from app.services.ai_summary_formatter import AiSummarySection, format_ai_summar
 
 ZIP_TIMESTAMP = (1980, 1, 1, 0, 0, 0)
 COVER_MAX_W = 800
-COVER_MAX_H = 1200
+COVER_MAX_H = 1000
 COVER_JPEG_Q = 85
 COVER_TIMEOUT = 10.0
 COVER_MARGIN_X = 72
@@ -329,7 +329,7 @@ def _cover_page_xhtml(digest_date: str, *, has_image: bool) -> str:
               .brand {{ font-size: 1.5em; font-weight: bold; }}
               .date {{ font-size: 0.9em; color: #555; margin-top: 0.5em; }}
               .cover-image {{ text-align: center; }}
-              .cover-image img {{ max-width: 100%; max-height: 95vh; object-fit: contain; }}
+              .cover-image img {{ max-width: 100%; max-height: 80vh; object-fit: contain; }}
             </style>
           </head>
           <body>

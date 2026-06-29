@@ -33,7 +33,7 @@
 1. 在 `epub_service.py` 顶部新增 `httpx`、`PIL.Image`、`PIL.ImageDraw`、`PIL.ImageFont` 导入及常量
 2. 实现 `_first_cover_url(articles)` — 遍历返回第一个非空 `cover_image_url`
 3. 实现 `_download_cover_image(url)` — httpx GET 下载 → Pillow 打开 → `convert("RGB")`
-4. 实现 `_compose_cover_jpeg(image, digest_date)` — 800×1200 白底画布 → 顶部左对齐逐字符绘制加粗大号 RSSWise + 日期 → 标题字间距 6px、日期字间距 3px、标题日期 gap 32px、图片 gap 96px → 下方居中放文章图 → JPEG 编码输出 `bytes`
+4. 实现 `_compose_cover_jpeg(image, digest_date)` — 800×1000 白底画布 → 顶部左对齐逐字符绘制加粗大号 RSSWise + 日期 → 标题字间距 6px、日期字间距 3px、标题日期 gap 32px、图片 gap 96px → 下方居中放文章图 → JPEG 编码输出 `bytes`
 5. 实现 `_cover_page_xhtml(digest_date, has_image)` — 生成 cover.xhtml 内容
 6. 修改 `build_digest_epub`：
    - 开头调用 `_first_cover_url` + `_download_cover_image`

@@ -111,23 +111,48 @@ def test_parse_ai_markdown_rejects_invalid_recommendation():
         parse_ai_markdown(response, source_markdown=LONG_MARKDOWN)
 
 
-def test_parse_ai_markdown_rejects_too_few_highlights():
+def test_parse_ai_markdown_allows_empty_highlights_and_omits_block():
+    response = VALID_RESPONSE.replace(
+        "- 原文中的第一句亮点。\n- 原文中的第二句亮点。\n- 原文中的第三句亮点。\n",
+        "",
+    )
+
+    result = parse_ai_markdown(response, source_markdown=LONG_MARKDOWN)
+
+    assert [block["type"] for block in result.ai_blocks] == [
+        "reading_question",
+        "summary",
+        "reading_reason",
+        "chapters",
+    ]
+
+
+def test_parse_ai_markdown_allows_one_highlight():
     response = VALID_RESPONSE.replace(
         "- 原文中的第二句亮点。\n- 原文中的第三句亮点。\n",
         "",
     )
 
-    with pytest.raises(AiBlockParseError, match="highlights must contain 3-5 items"):
-        parse_ai_markdown(response, source_markdown=LONG_MARKDOWN)
+    result = parse_ai_markdown(response, source_markdown=LONG_MARKDOWN)
+
+    highlights = [block for block in result.ai_blocks if block["type"] == "highlights"]
+    assert highlights == [
+        {
+            "type": "highlights",
+            "title": "Highlights",
+            "content": [{"text": "原文中的第一句亮点。", "quote_verified": False}],
+            "order": 40,
+        }
+    ]
 
 
 def test_parse_ai_markdown_rejects_too_many_highlights():
     response = VALID_RESPONSE.replace(
         "- 原文中的第三句亮点。\n",
-        "- 原文中的第三句亮点。\n- 原文中的第四句亮点。\n- 原文中的第五句亮点。\n- 原文中的第六句亮点。\n",
+        "- 原文中的第三句亮点。\n- 原文中的第四句亮点。\n",
     )
 
-    with pytest.raises(AiBlockParseError, match="highlights must contain 3-5 items"):
+    with pytest.raises(AiBlockParseError, match="highlights must contain 0-3 items"):
         parse_ai_markdown(response, source_markdown=LONG_MARKDOWN)
 
 

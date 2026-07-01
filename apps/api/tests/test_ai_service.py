@@ -81,4 +81,5 @@ def test_stream_analyze_markdown_yields_delta_content(monkeypatch: pytest.Monkey
     messages = fake_client.chat.completions.kwargs["messages"]
     assert "## 问题" in messages[0]["content"]
     assert "## Highlights" in messages[0]["content"]
+    assert "最多 3 条" in messages[0]["content"]
     assert "逐字摘录" in messages[0]["content"]

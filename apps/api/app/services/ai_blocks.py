@@ -46,8 +46,8 @@ def parse_ai_markdown(markdown: str, *, source_markdown: str) -> ParsedAiMarkdow
         _normalize_quote_text(item)
         for item in _bullet_items(sections["Highlights"])
     ]
-    if len(highlights) < 3 or len(highlights) > 5:
-        raise AiBlockParseError("highlights must contain 3-5 items")
+    if len(highlights) > 3:
+        raise AiBlockParseError("highlights must contain 0-3 items")
 
     summary = _single_text(sections["一句话摘要"], "summary")
     recommendation = _single_text(sections["阅读建议"], "reading recommendation")
@@ -74,16 +74,20 @@ def parse_ai_markdown(markdown: str, *, source_markdown: str) -> ParsedAiMarkdow
             "content": reading_reason,
             "order": 30,
         },
-        {
-            "type": "highlights",
-            "title": "Highlights",
-            "content": [
-                {"text": item, "quote_verified": False}
-                for item in highlights
-            ],
-            "order": 40,
-        },
     ]
+
+    if highlights:
+        blocks.append(
+            {
+                "type": "highlights",
+                "title": "Highlights",
+                "content": [
+                    {"text": item, "quote_verified": False}
+                    for item in highlights
+                ],
+                "order": 40,
+            }
+        )
 
     chapters = _bullet_items(sections.get("章节", ""))
     if chapters and markdown_allows_chapters(source_markdown):

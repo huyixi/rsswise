@@ -135,7 +135,7 @@ VALID_MARKDOWN_CHUNKS = [
     "## 一句话摘要\n这是一句话摘要。\n\n",
     "## 阅读理由\n这篇文章适合快速了解背景。\n",
     "## 阅读建议\nskim\n\n",
-    "## Highlights\n- 原文第一句。\n- 原文第二句。\n- 原文第三句。\n\n",
+    "## Highlights\n\n",
 ]
 
 
@@ -173,7 +173,7 @@ def test_analyze_article_streams_chunks_and_persists_final_result(
         ("chunk", str(article_id), {"text": "## 一句话摘要\n这是一句话摘要。\n\n"}),
         ("chunk", str(article_id), {"text": "## 阅读理由\n这篇文章适合快速了解背景。\n"}),
         ("chunk", str(article_id), {"text": "## 阅读建议\nskim\n\n"}),
-        ("chunk", str(article_id), {"text": "## Highlights\n- 原文第一句。\n- 原文第二句。\n- 原文第三句。\n\n"}),
+        ("chunk", str(article_id), {"text": "## Highlights\n\n"}),
         ("done", str(article_id), {"article_id": str(article_id)}),
     ]
 
@@ -186,7 +186,6 @@ def test_analyze_article_streams_chunks_and_persists_final_result(
             "reading_question",
             "summary",
             "reading_reason",
-            "highlights",
         ]
         assert analysis.reading_recommendation == ReadingRecommendation.skim
         assert analysis.one_sentence_summary is None

@@ -11,7 +11,7 @@ This feature expands the AI summary into a structured reading guide at the start
 - Replace scattered detail-display fields with an ordered `AiBlock[]` display model for article detail AI content.
 - Keep `reading_recommendation` as an independent field for recommendation badges and list-level filtering/display compatibility.
 - Generate one required guiding question for each newly successful AI analysis.
-- Generate 3-5 required highlights for each newly successful AI analysis.
+- Generate 0-3 highlights for each newly successful AI analysis.
 - Make highlights verbatim quotes from the source article according to prompt instructions.
 - Do not verify highlight quotes against the original markdown in the first version.
 - Generate chapters only when useful, and force chapters to empty for short/simple articles by backend rules.
@@ -95,7 +95,7 @@ Derivation rules:
 For new successful AI analyses:
 
 - `reading_question` is required.
-- `highlights` is required.
+- `highlights` is optional; omit it when there are no highlight items.
 - `summary` is required.
 - `reading_reason` is required.
 - `chapters` is optional and may be absent or have empty content.
@@ -121,7 +121,7 @@ The renderer must sort by `order`, not by array position alone.
 
 ### Highlights
 
-- Count: 3-5 items.
+- Count: 0-3 items.
 - Each item must be a verbatim quote from the article according to prompt instructions.
 - If the source article is English, highlights remain English because verbatim quoting takes precedence over unified Chinese output.
 - `quote_verified` is always `false` in this version because backend quote matching is explicitly out of scope.
@@ -205,7 +205,8 @@ Validation rules:
 
 - Required sections must be present: `问题`, `Highlights`, `一句话摘要`, `阅读建议`, `阅读理由`.
 - `问题` content must be non-empty.
-- `Highlights` must contain 3-5 bullet items.
+- `Highlights` must contain 0-3 bullet items.
+- If `Highlights` has 0 items, no `highlights` block is created.
 - Each highlight item must create `{ text, quote_verified: false }`.
 - `一句话摘要` content must be non-empty.
 - `阅读建议` must be one of `deep_read`, `skim`, or `skip`.
@@ -351,7 +352,7 @@ Backend tests:
 - Markdown parser accepts a valid full AI Markdown response.
 - Parser rejects missing required sections.
 - Parser rejects invalid recommendation values.
-- Parser rejects fewer than 3 or more than 5 highlights.
+- Parser accepts 0, 1, or 3 highlights and rejects more than 3 highlights.
 - Parser returns `quote_verified: false` for every highlight.
 - Chapter threshold discards chapters for short/simple markdown.
 - Chapter threshold preserves chapters for sufficiently long structured markdown.

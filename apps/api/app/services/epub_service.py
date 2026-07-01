@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from html import escape
 from io import BytesIO
 from textwrap import dedent
@@ -34,6 +35,18 @@ COVER_DATE_LETTER_SPACING = 3
 COVER_BACKGROUND = (255, 255, 255)
 COVER_TEXT = (24, 24, 24)
 COVER_MUTED_TEXT = (86, 86, 86)
+ARTICLE_IMAGE_TIMEOUT = 10.0
+ARTICLE_IMAGE_JPEG_Q = 90
+
+
+@dataclass(frozen=True)
+class EpubImageAsset:
+    item_id: str
+    href: str
+    chapter_src: str
+    archive_path: str
+    media_type: str
+    content: bytes
 
 
 def _is_epub_internal_href(href: str | None) -> bool:
@@ -51,6 +64,7 @@ def _markdown_link_open(tokens, idx, options, env) -> str:
         {
             "href": href.strip() if href else "",
             "is_internal": is_internal,
+            "has_image": False,
         }
     )
     if not is_internal:
@@ -62,9 +76,79 @@ def _markdown_link_close(tokens, idx, options, env) -> str:
     stack = env.setdefault("rsswise_link_stack", [])
     link = stack.pop() if stack else {"href": "", "is_internal": False}
     if not link["is_internal"]:
+        if link.get("has_image"):
+            return ""
         href = link["href"]
         return f" ({escape(href)})" if href else ""
     return MARKDOWN_RENDERER.renderer.renderToken(tokens, idx, options, env)
+
+
+def _is_remote_image_src(src: str | None) -> bool:
+    if not src:
+        return False
+
+    parsed = urlsplit(src.strip())
+    return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
+
+
+def _download_article_image(url: str) -> bytes | None:
+    try:
+        response = httpx.get(url, timeout=ARTICLE_IMAGE_TIMEOUT, follow_redirects=True)
+        response.raise_for_status()
+    except Exception:
+        return None
+
+    try:
+        with PILImage.open(BytesIO(response.content)) as img:
+            rgb_image = img.convert("RGB")
+            buf = BytesIO()
+            rgb_image.save(buf, format="JPEG", quality=ARTICLE_IMAGE_JPEG_Q)
+            return buf.getvalue()
+    except Exception:
+        return None
+
+
+def _next_article_image_asset(src: str, env) -> EpubImageAsset | None:
+    if "rsswise_article_index" not in env or "rsswise_image_assets" not in env:
+        return None
+
+    if not _is_remote_image_src(src):
+        return None
+
+    image_bytes = _download_article_image(src.strip())
+    if image_bytes is None:
+        return None
+
+    article_index = int(env.get("rsswise_article_index", 0))
+    image_index = int(env.get("rsswise_article_image_index", 0)) + 1
+    env["rsswise_article_image_index"] = image_index
+
+    filename = f"article-{article_index:03d}-{image_index:03d}.jpg"
+    asset = EpubImageAsset(
+        item_id=f"image-{article_index:03d}-{image_index:03d}",
+        href=f"images/{filename}",
+        chapter_src=f"../images/{filename}",
+        archive_path=f"OEBPS/images/{filename}",
+        media_type="image/jpeg",
+        content=image_bytes,
+    )
+    env.setdefault("rsswise_image_assets", []).append(asset)
+    return asset
+
+
+def _markdown_image(tokens, idx, options, env) -> str:
+    stack = env.setdefault("rsswise_link_stack", [])
+    if stack:
+        stack[-1]["has_image"] = True
+
+    token = tokens[idx]
+    src = token.attrGet("src") or ""
+    alt = token.content
+    asset = _next_article_image_asset(src, env)
+    if asset is None:
+        return escape(alt) if alt else ""
+
+    return f'<img src="{escape(asset.chapter_src)}" alt="{escape(alt)}" />'
 
 
 MARKDOWN_RENDERER = MarkdownIt(
@@ -76,13 +160,24 @@ MARKDOWN_RENDERER = MarkdownIt(
 ).enable("table")
 MARKDOWN_RENDERER.renderer.rules["link_open"] = _markdown_link_open
 MARKDOWN_RENDERER.renderer.rules["link_close"] = _markdown_link_close
+MARKDOWN_RENDERER.renderer.rules["image"] = _markdown_image
 
 
-def markdown_to_xhtml(markdown: str | None) -> str:
+def markdown_to_xhtml(
+    markdown: str | None,
+    *,
+    article_index: int | None = None,
+    image_assets: list[EpubImageAsset] | None = None,
+) -> str:
     if not markdown or not markdown.strip():
         return "<p>正文抽取未完成或失败。</p>"
 
-    return MARKDOWN_RENDERER.render(markdown)
+    env = {}
+    if article_index is not None:
+        env["rsswise_article_index"] = article_index
+    if image_assets is not None:
+        env["rsswise_image_assets"] = image_assets
+    return MARKDOWN_RENDERER.render(markdown, env)
 
 
 def _ai_section_xhtml(section: AiSummarySection, *, label: str | None = None) -> str:
@@ -142,12 +237,21 @@ def article_ai_xhtml(article: Article) -> tuple[str, str]:
     return preface, afterword
 
 
-def article_chapter_xhtml(article: Article, index: int) -> str:
+def article_chapter_xhtml(
+    article: Article,
+    index: int,
+    *,
+    image_assets: list[EpubImageAsset] | None = None,
+) -> str:
     source_title = article.feed.title if article.feed else ""
     ai_preface, ai_afterword = article_ai_xhtml(article)
     preface_body_divider = "<hr />" if ai_preface else ""
     body_afterword_divider = "<hr />" if ai_afterword else ""
-    article_body = markdown_to_xhtml(article.content.content_markdown if article.content else None)
+    article_body = markdown_to_xhtml(
+        article.content.content_markdown if article.content else None,
+        article_index=index,
+        image_assets=image_assets,
+    )
 
     return dedent(
         f"""\
@@ -387,11 +491,23 @@ def build_digest_epub(articles: list[Article], *, digest_date: str) -> bytes:
     cover_image = _download_cover_image(cover_url) if cover_url else None
     cover_bytes = _compose_cover_jpeg(cover_image, digest_date) if cover_image else None
     has_cover_image = cover_bytes is not None
+    image_assets: list[EpubImageAsset] = []
+    article_chapters = [
+        (
+            index,
+            article_chapter_xhtml(article, index, image_assets=image_assets),
+        )
+        for index, article in enumerate(articles, start=2)
+    ]
 
     cover_image_manifest = (
         '<item id="cover-image" href="cover.jpeg" media-type="image/jpeg" properties="cover-image" />'
         if has_cover_image
         else ""
+    )
+    article_image_manifest = "\n".join(
+        f'<item id="{asset.item_id}" href="{asset.href}" media-type="{asset.media_type}" />'
+        for asset in image_assets
     )
     chapter_items = "\n".join(
         (
@@ -428,6 +544,7 @@ def build_digest_epub(articles: list[Article], *, digest_date: str) -> bytes:
           <manifest>
             <item id="cover-page" href="cover.xhtml" media-type="application/xhtml+xml" />
             {cover_image_manifest}
+            {article_image_manifest}
             <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav" />
             {chapter_items}
           </manifest>
@@ -498,6 +615,13 @@ def build_digest_epub(articles: list[Article], *, digest_date: str) -> bytes:
                 cover_bytes,
                 compress_type=ZIP_DEFLATED,
             )
+        for asset in image_assets:
+            _write_file(
+                archive,
+                asset.archive_path,
+                asset.content,
+                compress_type=ZIP_DEFLATED,
+            )
         _write_file(archive, "OEBPS/nav.xhtml", nav_xhtml, compress_type=ZIP_DEFLATED)
         _write_file(archive, "OEBPS/toc.ncx", toc_ncx, compress_type=ZIP_DEFLATED)
         _write_file(
@@ -506,11 +630,11 @@ def build_digest_epub(articles: list[Article], *, digest_date: str) -> bytes:
             digest_summary_chapter_xhtml(articles, digest_date),
             compress_type=ZIP_DEFLATED,
         )
-        for index, article in enumerate(articles, start=2):
+        for index, chapter_xhtml in article_chapters:
             _write_file(
                 archive,
                 f"OEBPS/chapters/article-{index:03d}.xhtml",
-                article_chapter_xhtml(article, index),
+                chapter_xhtml,
                 compress_type=ZIP_DEFLATED,
             )
     return output.getvalue()

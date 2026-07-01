@@ -156,6 +156,33 @@ def test_build_digest_epub_renders_external_markdown_link_as_plain_text() -> Non
     assert '<a href="https://example.com/docs?a=1&amp;b=2">' not in chapter
 
 
+def test_build_digest_epub_embeds_linked_markdown_image_asset(mocker) -> None:
+    article = make_article(
+        content_markdown="[![示例图](https://example.com/image.jpg)](https://example.com/image.jpg)"
+    )
+
+    _mock_httpx_get(mocker, _tiny_jpeg(320, 240))
+
+    epub = build_digest_epub([article], digest_date="2026-06-04")
+
+    with zipfile.ZipFile(BytesIO(epub)) as archive:
+        names = set(archive.namelist())
+        chapter = archive.read("OEBPS/chapters/article-002.xhtml").decode()
+        opf = archive.read("OEBPS/content.opf").decode()
+        embedded_image = archive.read("OEBPS/images/article-002-001.jpg")
+
+    assert "OEBPS/images/article-002-001.jpg" in names
+    assert '<img src="../images/article-002-001.jpg" alt="示例图" />' in chapter
+    assert "https://example.com/image.jpg" not in chapter
+    assert '<item id="image-002-001"' in opf
+    assert 'href="images/article-002-001.jpg"' in opf
+    assert 'media-type="image/jpeg"' in opf
+
+    image = PILImage.open(BytesIO(embedded_image))
+    assert image.format == "JPEG"
+    assert image.size == (320, 240)
+
+
 def test_build_digest_epub_renders_markdown_inline_and_fenced_code() -> None:
     chapter = chapter_xhtml_for("调用 `inline()`。\n\n```python\nprint('hi')\n```")
 
